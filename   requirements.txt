@@ -1,0 +1,6 @@
+flask
+llama-index
+llama-index-readers-file
+python-docx
+pydantic
+docx2txt

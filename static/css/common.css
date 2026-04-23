@@ -1,0 +1,68 @@
+/* 文件位置：css/common.css */
+/* 核心布局与侧边栏样式 (去AI化、企业级命名) */
+
+body {
+    margin: 0;
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+    background-color: #f4f7fc;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.sidebar {
+    width: 220px;
+    background-color: #1a365d;
+    color: #e2e8f0;
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar .logo {
+    padding: 20px;
+    color: #fff;
+    font-size: 18px;
+    font-weight: bold;
+    border-bottom: 1px solid #2a4365;
+    text-align: center;
+}
+
+.sidebar .nav-item {
+    padding: 15px 20px;
+    cursor: pointer;
+    border-left: 4px solid transparent;
+    color: #cbd5e1;
+    transition: 0.2s;
+    text-decoration: none;
+    display: block;
+}
+
+.sidebar .nav-item:hover {
+    background-color: #2a4365;
+    color: #fff;
+}
+
+.sidebar .nav-item.active {
+    background-color: #2a4365;
+    color: #fff;
+    border-left: 4px solid #60a5fa;
+    font-weight: bold;
+}
+
+.main-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+}
+
+.top-header {
+    background: #fff;
+    height: 50px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    color: #64748b;
+    font-size: 14px;
+}

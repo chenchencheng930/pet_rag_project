@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>宠主交流社区 - 临床决策平台</title>
+    <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/common.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/community.css') }}" rel="stylesheet">
+    <style>
+        body { margin: 0; display: flex; min-height: 100vh; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        .sidebar { width: 220px; background-color: #1a365d; color: #e2e8f0; display: flex; flex-direction: column; z-index: 1000; box-shadow: 2px 0 10px rgba(0,0,0,0.05); flex-shrink: 0; }
+        .sidebar-brand { height: 60px; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid #2a4365; padding: 0 15px; background-color: #152c4d; }
+        .sidebar-brand img { max-width: 100%; max-height: 35px; object-fit: contain; }
+        .nav-item { padding: 14px 20px; cursor: pointer; border-left: 3px solid transparent; color: #94a3b8; transition: all 0.2s ease; text-decoration: none; display: block; font-size: 14px; }
+        .nav-item:hover { background-color: #2a4365; color: #ffffff; }
+        .nav-item.active { background-color: #2a4365; color: #ffffff; border-left-color: #3b82f6; font-weight: 500; }
+        .main-content { flex: 1; display: flex; flex-direction: column; overflow-y: auto; min-width: 0; }
+        .top-header { background: #ffffff; height: 50px; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; padding: 0 24px; color: #475569; font-size: 13px; z-index: 10; flex-shrink: 0; }
+
+        .comment-panel { margin-top: 16px; padding-top: 16px; border-top: 1px solid #eef2f7; }
+        .comment-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
+        .comment-item { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 12px; }
+        .comment-author { font-size: 13px; font-weight: 600; color: #1e293b; margin-bottom: 4px; }
+        .comment-text { font-size: 13px; color: #475569; line-height: 1.5; word-break: break-word; }
+        .comment-time { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+        .comment-empty { font-size: 13px; color: #94a3b8; padding: 6px 0 10px; }
+        .comment-input-row { display: flex; gap: 10px; align-items: flex-start; }
+        .comment-input { flex: 1; min-height: 42px; resize: vertical; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px 12px; font-size: 14px; outline: none; }
+        .comment-submit-btn { border: none; background: #1a73e8; color: #fff; border-radius: 8px; padding: 10px 16px; font-size: 13px; cursor: pointer; white-space: nowrap; }
+        .comment-submit-btn:hover { background: #1557b0; }
+        .feed-action-btn.active { color: #1a73e8; font-weight: 600; }
+
+        @media (max-width: 768px) {
+            body { display: block; }
+            .sidebar { display: none; }
+            .top-header { padding: 12px; font-size: 12px; height: auto; }
+            .community-wrapper { padding: 12px !important; }
+            .publisher-toolbar { flex-direction: column; align-items: stretch !important; gap: 12px; }
+            .toolbar-actions { flex-wrap: wrap; gap: 10px; }
+            .btn-publish { width: 100%; border-radius: 10px !important; }
+            .comment-input-row { flex-direction: column; }
+            .comment-submit-btn { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <aside class="sidebar">
+        <div class="sidebar-brand">
+            <img src="{{ url_for('static', filename='assets/logo.jpg') }}" alt="系统Logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+            <span style="display:none;color:#fff;font-size:18px;font-weight:bold;">一宠一配方</span>
+        </div>
+        <nav class="nav-menu">
+            <a href="{{ url_for('home') }}" class="nav-item">平台首页</a>
+            <a href="{{ url_for('chat') }}" class="nav-item">智能问诊台</a>
+            <a href="{{ url_for('dashboard') }}" class="nav-item">深度健康评估</a>
+            <a href="{{ url_for('community') }}" class="nav-item active">宠主社区</a>
+            <a href="{{ url_for('reminder') }}" class="nav-item">健康提醒</a>
+            <a href="{{ url_for('profile') }}" class="nav-item">个人中心</a>
+        </nav>
+    </aside>
+
+    <main class="main-content">
+        <header class="top-header">
+            <span>工作台 / 宠主交流社区</span>
+            <span style="color:#64748b;font-weight:500;">知识图谱与互助网络</span>
+        </header>
+
+        <section class="community-wrapper" style="max-width:800px;margin:0 auto;width:100%;padding:20px;">
+            <div class="publisher-card" style="background:#fff;border-radius:12px;padding:20px;box-shadow:0 2px 12px rgba(0,0,0,0.03);border:1px solid #e2e8f0;margin-bottom:24px;">
+                <textarea id="postInput" class="publisher-input" placeholder="提出宠物健康疑问，或分享您的临床护理经验..." style="width:100%;min-height:80px;border:none;outline:none;resize:none;font-size:15px;"></textarea>
+
+                <div id="imagePreviewContainer" class="preview-container" style="display:none;">
+                    <img id="imagePreview" src="" alt="影像预览" style="max-height:120px;border-radius:6px;display:block;">
+                    <span class="remove-btn" onclick="removeImage()" style="display:block;text-align:center;font-size:12px;color:#ef4444;margin-top:8px;cursor:pointer;">删除影像</span>
+                </div>
+
+                <div class="publisher-toolbar" style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:12px;border-top:1px solid #f1f5f9;">
+                    <div class="toolbar-actions" style="display:flex;align-items:center;gap:15px;">
+                        <input type="file" id="fileUpload" accept="image/*" style="display:none;" onchange="handleImageSelection(event)">
+
+                        <div class="tool-btn" onclick="document.getElementById('fileUpload').click()" style="color:#64748b;font-size:14px;cursor:pointer;display:flex;align-items:center;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                <polyline points="21 15 16 10 5 21"></polyline>
+                            </svg>
+                            上传影像/病例
+                        </div>
+
+                        <div class="topic-input-wrapper">
+                            <input type="text" id="topicInput" class="topic-custom-input" list="topicSuggestions" placeholder="# 搜索或自定义话题">
+                            <datalist id="topicSuggestions">
+                                <option value="临床求助"></option>
+                                <option value="日常护理"></option>
+                                <option value="营养配方"></option>
+                                <option value="行为矫正"></option>
+                                <option value="好物避雷"></option>
+                            </datalist>
+                        </div>
+                    </div>
+                    <button class="btn-publish" id="publishBtn" onclick="submitPost()" style="background:#1a73e8;color:#fff;border:none;padding:8px 24px;border-radius:20px;font-size:14px;font-weight:500;cursor:pointer;">发 布</button>
+                </div>
+            </div>
+
+            <div id="feedContainer"></div>
+        </section>
+    </main>
+
+    <script>
+        const DEFAULT_AVATAR = "{{ url_for('static', filename='assets/default_avatar.png') }}";
+        let currentSelectedImageBase64 = '';
+        let currentPreviewObjectUrl = '';
+
+        const CommunityDataStore = {
+            feeds: [],
+            getCurrentUser() {
+                return localStorage.getItem('currentUser') || '匿名访客';
+            }
+        };
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadPostsFromServer();
+});
+
+
+        async function loadPostsFromServer() {
+            try {
+                const res = await fetch('/api/community/posts');
+                const json = await res.json();
+
+                if (json.code === 200) {
+                    CommunityDataStore.feeds = (json.data || []).map(post => ({
+                        id: post.id,
+                        authorName: post.author_name || '社区用户',
+                        avatarUrl: localStorage.getItem(`avatar_${post.author_name}`) || DEFAULT_AVATAR,
+                        publishTime: post.created_at || '刚刚',
+                        petInfo: '系统认证用户',
+                        topic: post.topic || '',
+                        content: post.content || '',
+                        imageUrl: post.image_url || '',
+                        likes: post.like_count || 0,
+                        comments: post.comment_count || 0,
+                        comments_list: post.comments_list || [],
+                        isLiked: false,
+                        commentsExpanded: false
+                    }));
+                } else {
+                    CommunityDataStore.feeds = [];
+                }
+            } catch (e) {
+                CommunityDataStore.feeds = [];
+            }
+
+            renderFeedList();
+        }
+
+        function renderFeedList() {
+            const container = document.getElementById('feedContainer');
+            if (!container) return;
+
+            container.innerHTML = '';
+
+            if (CommunityDataStore.feeds.length === 0) {
+                container.innerHTML = `
+                    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:28px;text-align:center;color:#94a3b8;">
+                        暂无社区内容，快来发布第一条帖子吧。
+                    </div>
+                `;
+                return;
+            }
+
+            CommunityDataStore.feeds.forEach(post => {
+                const likeClass = post.isLiked ? 'feed-action-btn active' : 'feed-action-btn';
+                const commentClass = post.commentsExpanded ? 'feed-action-btn active' : 'feed-action-btn';
+                const topicHtml = post.topic ? `<span class="topic-tag" style="color:#1a73e8;font-weight:500;margin-right:8px;">#${post.topic}</span>` : '';
+                const imageHtml = post.imageUrl ? `<img src="${post.imageUrl}" class="feed-image" alt="附件影像" style="max-width:100%;max-height:300px;border-radius:8px;margin-top:12px;border:1px solid #e2e8f0;display:block;">` : '';
+
+                const commentsHtml = post.comments_list && post.comments_list.length > 0
+                    ? post.comments_list.map(comment => `
+                        <div class="comment-item">
+                            <div class="comment-author">${comment.author_name}</div>
+                            <div class="comment-text">${escapeHtml(comment.content)}</div>
+                            <div class="comment-time">${comment.created_at || ''}</div>
+                        </div>
+                    `).join('')
+                    : `<div class="comment-empty">还没有评论，来抢沙发吧。</div>`;
+
+                const panelHtml = post.commentsExpanded ? `
+                    <div class="comment-panel">
+                        <div class="comment-list">${commentsHtml}</div>
+                        <div class="comment-input-row">
+                            <textarea id="comment-input-${post.id}" class="comment-input" placeholder="写下你的评论..."></textarea>
+                            <button class="comment-submit-btn" onclick="submitComment(${post.id})">发送评论</button>
+                        </div>
+                    </div>
+                ` : '';
+
+                const postHtml = `
+                    <article class="feed-item" id="post-${post.id}" style="background-color:#ffffff;border-radius:12px;padding:24px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,0.02);border:1px solid #e2e8f0;transition:box-shadow 0.2s;">
+                        <div class="feed-header" style="display:flex;align-items:center;margin-bottom:16px;">
+                            <img src="${post.avatarUrl || DEFAULT_AVATAR}" alt="用户头像" class="author-avatar" style="width:44px;height:44px;border-radius:50%;background-color:#e2e8f0;margin-right:12px;object-fit:cover;" onerror="this.src='${DEFAULT_AVATAR}'">
+                            <div class="author-info" style="display:flex;flex-direction:column;">
+                                <span class="author-name" style="font-size:15px;font-weight:600;color:#1e293b;margin-bottom:2px;">${post.authorName}</span>
+                                <div class="author-meta" style="font-size:12px;color:#94a3b8;display:flex;gap:10px;">
+                                    <span>${post.publishTime}</span>
+                                    <span class="pet-tag" style="background-color:#f1f5f9;color:#475569;padding:2px 6px;border-radius:4px;font-size:11px;">${post.petInfo}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="feed-content" style="font-size:15px;color:#334155;line-height:1.7;margin-bottom:16px;word-break:break-word;">
+                            ${topicHtml} ${escapeHtml(post.content)}
+                            ${imageHtml}
+                        </div>
+
+                        <div class="feed-footer" style="display:flex;gap:24px;margin-top:16px;padding-top:16px;border-top:1px solid #f8fafc;">
+                            <div class="${likeClass}" onclick="toggleLike(${post.id})" style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;transition:color 0.2s;user-select:none;">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path>
+                                </svg>
+                                <span>赞同 ${post.likes}</span>
+                            </div>
+                            <div class="${commentClass}" onclick="toggleComments(${post.id})" style="display:flex;align-items:center;gap:6px;color:#64748b;font-size:13px;cursor:pointer;">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                                </svg>
+                                <span>评论 ${post.comments}</span>
+                            </div>
+                        </div>
+
+                        ${panelHtml}
+                    </article>
+                `;
+                container.insertAdjacentHTML('beforeend', postHtml);
+            });
+        }
+
+        function escapeHtml(value) {
+            return String(value || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function toggleComments(postId) {
+            const post = CommunityDataStore.feeds.find(p => p.id === postId);
+            if (!post) return;
+            post.commentsExpanded = !post.commentsExpanded;
+            renderFeedList();
+        }
+
+        function handleImageSelection(event) {
+            const file = event.target.files[0];
+            if (file) {
+                if (currentPreviewObjectUrl) {
+                    URL.revokeObjectURL(currentPreviewObjectUrl);
+                }
+                currentPreviewObjectUrl = URL.createObjectURL(file);
+                document.getElementById('imagePreview').src = currentPreviewObjectUrl;
+                document.getElementById('imagePreviewContainer').style.display = 'inline-block';
+
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    currentSelectedImageBase64 = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function removeImage() {
+            currentSelectedImageBase64 = '';
+            document.getElementById('fileUpload').value = '';
+            document.getElementById('imagePreview').src = '';
+            document.getElementById('imagePreviewContainer').style.display = 'none';
+            if (currentPreviewObjectUrl) {
+                URL.revokeObjectURL(currentPreviewObjectUrl);
+                currentPreviewObjectUrl = '';
+            }
+        }
+
+        async function submitPost() {
+            const inputEl = document.getElementById('postInput');
+            const topicEl = document.getElementById('topicInput');
+            const content = inputEl.value.trim();
+            let topic = topicEl.value.trim().replace(/^#+/, '');
+
+            if (!content) {
+                alert('发布内容不可为空');
+                return;
+            }
+
+            const author = CommunityDataStore.getCurrentUser();
+
+            try {
+                const res = await fetch('/api/community/posts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        author_name: author,
+                        topic: topic,
+                        content: content,
+                        image_url: currentSelectedImageBase64
+                    })
+                });
+
+                const json = await res.json();
+                if (json.code !== 200) {
+                    alert(json.message || '发帖失败');
+                    return;
+                }
+
+                inputEl.value = '';
+                topicEl.value = '';
+                removeImage();
+                await loadPostsFromServer();
+            } catch (e) {
+                alert('发帖失败，请检查后端接口是否启动');
+            }
+        }
+
+        async function submitComment(postId) {
+            const textarea = document.getElementById(`comment-input-${postId}`);
+            if (!textarea) return;
+
+            const content = textarea.value.trim();
+            if (!content) {
+                alert('评论内容不能为空');
+                return;
+            }
+
+            const author = CommunityDataStore.getCurrentUser();
+
+            try {
+                const res = await fetch('/api/community/comments', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        post_id: postId,
+                        author_name: author,
+                        content: content
+                    })
+                });
+
+                const json = await res.json();
+                if (json.code !== 200) {
+                    alert(json.message || '评论失败');
+                    return;
+                }
+
+                const post = CommunityDataStore.feeds.find(p => p.id === postId);
+                if (post) {
+                    if (!Array.isArray(post.comments_list)) {
+                        post.comments_list = [];
+                    }
+                    post.comments_list.push(json.data);
+                    post.comments = (post.comments || 0) + 1;
+                    post.commentsExpanded = true;
+                }
+
+                renderFeedList();
+            } catch (e) {
+                alert('评论失败，请检查后端接口是否启动');
+            }
+        }
+
+
+        async function toggleLike(postId) {
+            try {
+                const res = await fetch(`/api/community/posts/${postId}/like`, {
+                    method: 'POST'
+                });
+                const json = await res.json();
+                if (json.code === 200) {
+                    await loadPostsFromServer();
+                } else {
+                    alert('点赞失败');
+                }
+            } catch (e) {
+                alert('点赞失败');
+            }
+        }
+
+
+    </script>
+<script src="{{ url_for('static', filename='js/global_reminder.js') }}"></script>
+</body>
+</html>

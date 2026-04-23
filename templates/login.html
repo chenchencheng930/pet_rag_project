@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>系统鉴权 - 一宠一配方</title>
+    <style>
+        /* 基础页面设置 */
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #f8fafc;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        /* 核心卡片容器 */
+        .auth-card {
+            background-color: #ffffff;
+            width: 100%;
+            max-width: 420px;
+            padding: 50px 40px;
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.04);
+            border: 1px solid #f1f5f9;
+            text-align: center;
+        }
+
+        /* Logo 区域 */
+        .brand-logo-container {
+            width: 100px;
+            height: 100px;
+            margin: 0 auto 20px;
+            border-radius: 50%;
+            padding: 5px;
+            border: 2px solid #eff6ff;
+            background-color: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .brand-logo-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            border-radius: 50%;
+        }
+
+        .brand-title {
+            color: #1e3a8a;
+            font-size: 28px;
+            font-weight: 800;
+            letter-spacing: 2px;
+            margin: 0 0 10px 0;
+        }
+
+        .brand-subtitle {
+            color: #64748b;
+            font-size: 13px;
+            margin-bottom: 40px;
+        }
+
+        /* 表单控件 */
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 14px 16px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 15px;
+            color: #334155;
+            box-sizing: border-box;
+            outline: none;
+            transition: all 0.2s ease;
+        }
+
+        .form-control:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        /* 按钮与交互 */
+        .btn-primary {
+            width: 100%;
+            background-color: #1a73e8; /* 匹配截图的主题蓝 */
+            color: #ffffff;
+            border: none;
+            padding: 14px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            margin-top: 10px;
+        }
+
+        .btn-primary:hover {
+            background-color: #1557b0;
+        }
+
+        .auth-switch {
+            margin-top: 20px;
+            font-size: 13px;
+            color: #64748b;
+        }
+
+        .auth-switch a {
+            color: #1a73e8;
+            text-decoration: none;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .auth-switch a:hover {
+            text-decoration: underline;
+        }
+
+        .alert-message {
+            color: #ef4444;
+            font-size: 13px;
+            margin-top: -10px;
+            margin-bottom: 15px;
+            text-align: left;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="auth-card">
+        <div class="brand-logo-container">
+            <img src="{{ url_for('static', filename='assets/logo.jpg') }}" alt="Logo" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 100 100\'><circle cx=\'50\' cy=\'50\' r=\'50\' fill=\'%23eff6ff\'/><text x=\'50\' y=\'55\' font-size=\'14\' text-anchor=\'middle\' fill=\'%231a73e8\' font-family=\'sans-serif\'>Image</text></svg>'">
+        </div>
+        
+        <h1 class="brand-title">一宠一配方</h1>
+        <p class="brand-subtitle">赋能电商全链路，让每一次选粮都精准无误</p>
+
+        <form id="authForm">
+            <div class="form-group">
+                <input type="text" id="username" class="form-control" placeholder="用户名：" required autocomplete="off">
+            </div>
+            
+            <div class="form-group">
+                <input type="password" id="password" class="form-control" placeholder="密码：" required>
+            </div>
+
+            <div id="alertMessage" class="alert-message">用户名或密码错误</div>
+
+            <button type="submit" class="btn-primary" id="submitBtn">登 陆</button>
+        </form>
+
+        <div class="auth-switch">
+            <span id="switchText">还没有账号？</span> 
+            <a id="switchLink" onclick="toggleAuthMode()">立即注册</a>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * 鉴权控制器 (Auth Controller)
+         * 管理本地数据的存储(Register)与读取(Login)校验
+         */
+        
+        let isLoginMode = true; // 默认显示为登录模式
+
+        const form = document.getElementById('authForm');
+        const submitBtn = document.getElementById('submitBtn');
+        const switchText = document.getElementById('switchText');
+        const switchLink = document.getElementById('switchLink');
+        const alertMsg = document.getElementById('alertMessage');
+
+        // 切换 登录/注册 模式
+        function toggleAuthMode() {
+            isLoginMode = !isLoginMode;
+            alertMsg.style.display = 'none'; // 切换时清空报错
+            document.getElementById('password').value = ''; // 清空密码框
+            
+            if (isLoginMode) {
+                submitBtn.innerText = '登 陆';
+                switchText.innerText = '还没有账号？';
+                switchLink.innerText = '立即注册';
+            } else {
+                submitBtn.innerText = '注 册';
+                switchText.innerText = '已有账号？';
+                switchLink.innerText = '返回登陆';
+            }
+        }
+
+        // 处理表单提交
+        form.addEventListener('submit', function(event) {
+            event.preventDefault(); // 阻止浏览器默认刷新
+            alertMsg.style.display = 'none';
+            
+            const userVal = document.getElementById('username').value.trim();
+            const passVal = document.getElementById('password').value.trim();
+
+            // 获取本地数据库（若无则初始化为空对象）
+            let userDatabase = JSON.parse(localStorage.getItem('userDatabase')) || {};
+
+            if (isLoginMode) {
+                // 执行登录校验逻辑
+                if (userDatabase[userVal] && userDatabase[userVal] === passVal) {
+                    // 校验成功，写入当前会话状态
+                    localStorage.setItem('currentUser', userVal);
+                    window.location.href = '/'; // 跳转至系统首页
+                } else {
+                    alertMsg.innerText = "用户名或密码错误，请重试";
+                    alertMsg.style.display = 'block';
+                }
+            } else {
+                // 执行注册存储逻辑
+                if (userDatabase[userVal]) {
+                    alertMsg.innerText = "该用户名已被注册";
+                    alertMsg.style.display = 'block';
+                } else {
+                    // 存入模拟数据库
+                    userDatabase[userVal] = passVal;
+                    localStorage.setItem('userDatabase', JSON.stringify(userDatabase));
+                    
+                    alert("注册成功！即将为您自动登录。");
+                    localStorage.setItem('currentUser', userVal);
+                    window.location.href = "{{ url_for('home') }}";
+                }
+            }
+        });
+    </script>
+<script src="{{ url_for('static', filename='js/global_reminder.js') }}"></script>
+</body>
+</html>

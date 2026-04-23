@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>健康提醒 - 临床决策平台</title>
+    <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/common.css') }}" rel="stylesheet">
+    <style>
+        body { margin: 0; display: flex; min-height: 100vh; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        .sidebar { width: 220px; background-color: #1a365d; color: #e2e8f0; display: flex; flex-direction: column; z-index: 1000; box-shadow: 2px 0 10px rgba(0,0,0,0.05); flex-shrink: 0; }
+        .sidebar-brand { height: 60px; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid #2a4365; padding: 0 15px; background-color: #152c4d; }
+        .sidebar-brand img { max-width: 100%; max-height: 35px; object-fit: contain; }
+        .nav-item { padding: 14px 20px; cursor: pointer; border-left: 3px solid transparent; color: #94a3b8; transition: all 0.2s ease; text-decoration: none; display: block; font-size: 14px; }
+        .nav-item:hover { background-color: #2a4365; color: #ffffff; }
+        .nav-item.active { background-color: #2a4365; color: #ffffff; border-left-color: #3b82f6; font-weight: 500; }
+        .main-content { flex: 1; display: flex; flex-direction: column; overflow-y: auto; min-width: 0; }
+        .top-header { background: #ffffff; height: 50px; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: space-between; padding: 0 24px; color: #475569; font-size: 13px; z-index: 10; flex-shrink: 0; }
+
+        .reminder-container { max-width: 720px; margin: 0 auto; width: 100%; padding: 30px 20px; }
+        .module-card { background: #ffffff; border-radius: 16px; padding: 30px; box-shadow: 0 4px 20px rgba(0,0,0,0.03); border: 1px solid #e2e8f0; margin-bottom: 24px; }
+        .card-header-flex { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; gap: 12px; flex-wrap: wrap; }
+        .module-title { font-size: 18px; font-weight: 600; color: #1e293b; margin: 0; }
+        .module-tag { background: #eff6ff; color: #3b82f6; font-size: 12px; padding: 4px 12px; border-radius: 12px; font-weight: 500; }
+
+        .day-highlight { font-size: 36px; font-weight: 800; color: #1a73e8; text-align: center; margin-bottom: 5px; }
+        .day-sub { font-size: 13px; color: #64748b; text-align: center; margin-bottom: 24px; }
+
+        .diet-progress-bar { display: flex; height: 40px; border-radius: 8px; overflow: hidden; margin-bottom: 12px; }
+        .progress-old, .progress-new { display: flex; align-items: center; justify-content: center; color: #fff; font-weight: bold; font-size: 14px; transition: width 0.5s; }
+        .progress-old { background-color: #f59e0b; }
+        .progress-new { background-color: #1a73e8; }
+
+        .diet-labels { display: flex; justify-content: space-between; gap: 16px; font-size: 13px; color: #475569; margin-bottom: 30px; }
+        .diet-labels strong { font-size: 18px; color: #1e293b; display: block; margin-top: 4px; }
+        .dot-old, .dot-new { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+        .dot-old { background: #f59e0b; }
+        .dot-new { background: #1a73e8; }
+
+        .feedback-section { border-top: 1px dashed #e2e8f0; padding-top: 24px; }
+        .feedback-title { font-size: 14px; font-weight: 600; color: #334155; margin-bottom: 16px; }
+        .feedback-buttons { display: flex; gap: 16px; }
+        .btn-feedback { flex: 1; padding: 14px; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.2s; text-align: center; background: #fff; }
+        .btn-good { border: 2px solid #a7f3d0; color: #059669; }
+        .btn-good:hover { background: #ecfdf5; }
+        .btn-bad { border: 2px solid #fecaca; color: #ef4444; }
+        .btn-bad:hover { background: #fef2f2; }
+
+        .medical-alert { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 16px 20px; border-radius: 0 8px 8px 0; margin-bottom: 24px; }
+        .medical-alert-title { font-size: 14px; font-weight: 600; color: #b45309; margin-bottom: 8px; display: flex; align-items: center; }
+        .medical-alert-text { font-size: 13px; color: #92400e; line-height: 1.6; margin: 0; }
+
+        .timeline { position: relative; padding-left: 20px; margin: 0; list-style: none; }
+        .timeline::before { content: ''; position: absolute; left: 6px; top: 8px; bottom: 0; width: 2px; background: #e2e8f0; }
+        .timeline-item { position: relative; padding-bottom: 24px; }
+        .timeline-item::before { content: ''; position: absolute; left: -20px; top: 4px; width: 14px; height: 14px; border-radius: 50%; background: #fff; border: 2px solid #cbd5e1; z-index: 1; }
+        .timeline-item.active::before { border-color: #10b981; background: #10b981; box-shadow: 0 0 0 3px #d1fae5; }
+        .timeline-item.completed::before { border-color: #10b981; background: #fff; }
+        .timeline-content { background: #f8fafc; padding: 16px; border-radius: 8px; border: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+        .timeline-item.active .timeline-content { background: #eff6ff; border-color: #bfdbfe; }
+        .tl-day { font-size: 15px; font-weight: 600; color: #1e293b; margin-bottom: 4px; }
+        .tl-desc { font-size: 13px; color: #64748b; }
+        .tl-ratio { font-size: 14px; font-weight: 600; color: #1a73e8; }
+
+        .reminder-form { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+        .input-time { padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; outline: none; font-family: inherit; min-height: 42px; }
+        .input-text { flex: 1; min-width: 240px; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; outline: none; min-height: 42px; }
+        .btn-add { background: #1a73e8; color: #fff; border: none; padding: 0 20px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: 0.2s; min-height: 42px; }
+        .btn-add:hover { background: #1557b0; }
+
+        .reminder-list { list-style: none; padding: 0; margin: 0; }
+        .reminder-list-item { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 16px; border-bottom: 1px solid #f1f5f9; }
+        .reminder-time { font-size: 16px; font-weight: bold; color: #0f172a; width: 60px; flex-shrink: 0; }
+        .reminder-label { flex: 1; font-size: 14px; color: #475569; }
+        .reminder-delete { color: #ef4444; cursor: pointer; font-size: 13px; flex-shrink: 0; }
+
+        #toastContainer { position: fixed; top: 20px; right: 24px; z-index: 9999; display: flex; flex-direction: column; gap: 12px; }
+        .toast-card { background: #ffffff; border-left: 4px solid #3b82f6; box-shadow: 0 10px 25px rgba(0,0,0,0.1); padding: 16px 24px; border-radius: 8px; display: flex; align-items: flex-start; gap: 16px; width: min(320px, calc(100vw - 32px)); transform: translateX(120%); transition: transform 0.4s ease; }
+        .toast-card.show { transform: translateX(0); }
+        .toast-icon { font-size: 24px; line-height: 1; }
+        .toast-title { font-size: 15px; font-weight: 600; color: #1e293b; margin: 0 0 4px 0; }
+        .toast-desc { font-size: 13px; color: #64748b; margin: 0; line-height: 1.4; }
+
+        @media (max-width: 768px) {
+            body { display: block; }
+            .sidebar { display: none; }
+            .top-header { padding: 12px; font-size: 12px; height: auto; }
+            .reminder-container { padding: 16px 12px; }
+            .module-card { padding: 20px; }
+            .diet-labels, .feedback-buttons, .timeline-content { flex-direction: column; align-items: flex-start; }
+            .btn-feedback, .btn-add { width: 100%; }
+            #toastContainer { right: 12px; left: 12px; }
+        }
+    </style>
+</head>
+<body>
+    <aside class="sidebar">
+        <div class="sidebar-brand">
+            <img src="{{ url_for('static', filename='assets/logo.jpg') }}" alt="系统Logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+            <span style="display:none;color:#fff;font-size:18px;font-weight:bold;">一宠一配方</span>
+        </div>
+        <nav class="nav-menu">
+            <a href="{{ url_for('home') }}" class="nav-item">平台首页</a>
+            <a href="{{ url_for('chat') }}" class="nav-item">智能问诊台</a>
+            <a href="{{ url_for('dashboard') }}" class="nav-item">深度健康评估</a>
+            <a href="{{ url_for('community') }}" class="nav-item">宠主社区</a>
+            <a href="{{ url_for('reminder') }}" class="nav-item active">健康提醒</a>
+            <a href="{{ url_for('profile') }}" class="nav-item">个人中心</a>
+        </nav>
+    </aside>
+
+    <main class="main-content">
+        <header class="top-header">
+            <span>工作台 / 健康提醒与协议</span>
+            <span style="color:#64748b;font-weight:500;">日程追踪与预后管理</span>
+        </header>
+
+        <section class="reminder-container">
+            <div class="module-card">
+                <div class="card-header-flex">
+                    <h2 class="module-title">动态换粮协议</h2>
+                    <span class="module-tag">标准 7-10 天过渡方案</span>
+                </div>
+
+                <div class="day-highlight">第 4 天</div>
+                <div class="day-sub">总喂食量建议：100g / 天</div>
+
+                <div class="diet-progress-bar">
+                    <div class="progress-old" style="width:50%;">50%</div>
+                    <div class="progress-new" style="width:50%;">50%</div>
+                </div>
+
+                <div class="diet-labels">
+                    <div>
+                        <span class="dot-old"></span>原粮：常规保养犬粮
+                        <strong>50g</strong>
+                    </div>
+                    <div style="text-align:right;">
+                        <span class="dot-new"></span>新粮：精准处方配方粮
+                        <strong>50g</strong>
+                    </div>
+                </div>
+
+                <div class="feedback-section">
+                    <div class="feedback-title">今日喂食反馈 (AI 监控中)</div>
+                    <div class="feedback-buttons">
+                        <button class="btn-feedback btn-good" onclick="submitFeedback('good')">😋 顺利吃完</button>
+                        <button class="btn-feedback btn-bad" onclick="submitFeedback('bad')">😞 拒食 / 吃得很少</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="module-card">
+                <h2 class="module-title" style="margin-bottom:20px;">换粮日程表与医嘱</h2>
+
+                <div class="medical-alert">
+                    <div class="medical-alert-title">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                        专科医疗库喂养提示
+                    </div>
+                    <p class="medical-alert-text">
+                        1. 请在兽医指导下使用处方粮，并采用 7–10 天逐步换粮方式。<br>
+                        2. 疾病恢复期需持续观察粪便情况与体重变化；若出现严重便秘或疑似梗阻，应立即就医，不可单纯依赖处方粮。<br>
+                        3. 建议分餐喂养，确保充足饮水以发挥纤维作用；严格控制零食摄入，按方案执行效果更稳定。
+                    </p>
+                </div>
+
+                <ul class="timeline">
+                    <li class="timeline-item completed">
+                        <div class="timeline-content">
+                            <div>
+                                <div class="tl-day">第 1-2 天</div>
+                                <div class="tl-desc">微量混入，观察便便情况</div>
+                            </div>
+                            <div class="tl-ratio">新 25%</div>
+                        </div>
+                    </li>
+                    <li class="timeline-item completed">
+                        <div class="timeline-content">
+                            <div>
+                                <div class="tl-day">第 3 天</div>
+                                <div class="tl-desc">逐步增加处方粮占比</div>
+                            </div>
+                            <div class="tl-ratio">新 40%</div>
+                        </div>
+                    </li>
+                    <li class="timeline-item active">
+                        <div class="timeline-content">
+                            <div>
+                                <div class="tl-day">第 4 天 (今日)</div>
+                                <div class="tl-desc">对半混合，关键过渡期</div>
+                            </div>
+                            <div class="tl-ratio">新 50%</div>
+                        </div>
+                    </li>
+                    <li class="timeline-item">
+                        <div class="timeline-content">
+                            <div>
+                                <div class="tl-day">第 5-6 天</div>
+                                <div class="tl-desc">新粮为主，持续观察精神状态</div>
+                            </div>
+                            <div class="tl-ratio">新 75%</div>
+                        </div>
+                    </li>
+                    <li class="timeline-item" style="padding-bottom:0;">
+                        <div class="timeline-content">
+                            <div>
+                                <div class="tl-day">第 7 天</div>
+                                <div class="tl-desc">完成过渡！完全替换为处方粮</div>
+                            </div>
+                            <div class="tl-ratio">新 100%</div>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="module-card">
+                <div class="card-header-flex">
+                    <h2 class="module-title">自定义用药/喂养提醒</h2>
+                </div>
+
+                <div class="reminder-form">
+                    <input type="time" id="reminderTime" class="input-time" required>
+                    <input type="text" id="reminderText" class="input-text" placeholder="例如：喂食泌尿处方药、清理猫砂盆..." required>
+                    <button class="btn-add" type="button" onclick="addReminder()">添加</button>
+                </div>
+
+                <ul class="reminder-list" id="reminderList"></ul>
+            </div>
+        </section>
+    </main>
+
+    <div id="toastContainer"></div>
+
+    <script>
+        const currentUser = localStorage.getItem('currentUser');
+        if (!currentUser) {
+            alert("访问此模块需要同步您的宠物病历，请先登录。");
+            window.location.href = "{{ url_for('login') }}";
+        }
+
+        let reminders = [];
+        let reminderTimer = null;
+
+        function submitFeedback(status) {
+            if (status === 'good') {
+                alert("反馈已记录：状态良好。系统将继续执行明天的过渡方案 (新粮比例将提升至 75%)。");
+            } else {
+                alert("反馈已记录：拒食/食欲不佳。AI 模型建议：请暂时将新粮比例回退至 25%，并尝试用温水泡软或添加少许宠物专用益生菌提高适口性。");
+            }
+        }
+
+        function showToast(title, message) {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = 'toast-card';
+            toast.innerHTML = `
+                <div class="toast-icon">🔔</div>
+                <div>
+                    <h4 class="toast-title">${escapeHtml(title)}</h4>
+                    <p class="toast-desc">${escapeHtml(message)}</p>
+                </div>
+            `;
+            container.appendChild(toast);
+
+            setTimeout(() => toast.classList.add('show'), 50);
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 400);
+            }, 5000);
+        }
+
+        function escapeHtml(value) {
+            return String(value || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function loadReminders() {
+            const stored = localStorage.getItem(`reminders_${currentUser}`);
+            if (stored) {
+                try {
+                    reminders = JSON.parse(stored);
+                    if (!Array.isArray(reminders)) {
+                        reminders = [];
+                    }
+                } catch (e) {
+                    reminders = [];
+                }
+            } else {
+                reminders = [
+                    { id: 1, time: "08:30", text: "早晨分餐喂养 (严格控制零食)", triggered: false, last_trigger_date: "" },
+                    { id: 2, time: "20:00", text: "观察并记录宠物粪便形态", triggered: false, last_trigger_date: "" }
+                ];
+                saveReminders();
+            }
+        }
+
+        function saveReminders() {
+            localStorage.setItem(`reminders_${currentUser}`, JSON.stringify(reminders));
+        }
+
+        function renderReminders() {
+            const listEl = document.getElementById('reminderList');
+            listEl.innerHTML = '';
+
+            reminders.sort((a, b) => a.time.localeCompare(b.time));
+
+            if (reminders.length === 0) {
+                listEl.innerHTML = '<li class="reminder-list-item"><div class="reminder-label" style="padding-left:0;color:#94a3b8;">当前还没有设置提醒</div></li>';
+                return;
+            }
+
+            reminders.forEach(rm => {
+                const li = document.createElement('li');
+                li.className = 'reminder-list-item';
+                li.innerHTML = `
+                    <div class="reminder-time">${escapeHtml(rm.time)}</div>
+                    <div class="reminder-label">${escapeHtml(rm.text)}</div>
+                    <div class="reminder-delete" onclick="deleteReminder(${rm.id})">删除</div>
+                `;
+                listEl.appendChild(li);
+            });
+        }
+
+        function addReminder() {
+            const timeVal = document.getElementById('reminderTime').value;
+            const textVal = document.getElementById('reminderText').value.trim();
+
+            if (!timeVal || !textVal) {
+                alert('请完整填写提醒时间和内容');
+                return;
+            }
+
+            reminders.push({
+                id: Date.now(),
+                time: timeVal,
+                text: textVal,
+                triggered: false,
+                last_trigger_date: ""
+            });
+
+            saveReminders();
+            renderReminders();
+
+            document.getElementById('reminderTime').value = '';
+            document.getElementById('reminderText').value = '';
+        }
+
+        function deleteReminder(id) {
+            reminders = reminders.filter(rm => rm.id !== id);
+            saveReminders();
+            renderReminders();
+        }
+
+        function resetDailyFlagsIfNeeded(todayKey) {
+            let changed = false;
+            reminders.forEach(rm => {
+                if (rm.last_trigger_date && rm.last_trigger_date !== todayKey) {
+                    rm.triggered = false;
+                    changed = true;
+                }
+            });
+            if (changed) {
+                saveReminders();
+            }
+        }
+
+        function startScheduler() {
+            if (reminderTimer) {
+                clearInterval(reminderTimer);
+            }
+
+            const tick = () => {
+                const now = new Date();
+                const hours = String(now.getHours()).padStart(2, '0');
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                const seconds = now.getSeconds();
+                const currentTime = `${hours}:${minutes}`;
+                const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+                resetDailyFlagsIfNeeded(todayKey);
+
+                let needsSave = false;
+
+                reminders.forEach(rm => {
+                    if (rm.time === currentTime && seconds === 0 && !rm.triggered) {
+                        showToast("健康日程提醒", rm.text);
+                        rm.triggered = true;
+                        rm.last_trigger_date = todayKey;
+                        needsSave = true;
+                    }
+                });
+
+                if (needsSave) {
+                    saveReminders();
+                }
+            };
+
+            tick();
+            reminderTimer = setInterval(tick, 1000);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadReminders();
+            renderReminders();
+            startScheduler();
+        });
+    </script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"45c2bf8136a245cd97f1c2e9a96c0730","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+</body>
+</html>

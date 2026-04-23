@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>宠物身体信息评估 - 临床智能辅助系统</title>
+    <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/common.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/dashboard.css') }}" rel="stylesheet">
+    <style>
+        /* 侧边栏 Logo 专属补丁样式 */
+        .sidebar-brand {
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-bottom: 1px solid #2a4365;
+            padding: 0 15px;
+            background-color: #152c4d;
+        }
+        .sidebar-brand img {
+            max-width: 100%;
+            max-height: 35px;
+            object-fit: contain;
+        }
+        @keyframes fadeIn { to { opacity: 1; } }
+    </style>
+</head>
+<body>
+
+    <aside class="sidebar">
+        <div class="sidebar-brand">
+            <img src="{{ url_for('static', filename='assets/logo.jpg') }}" alt="系统Logo">
+        </div>
+        <nav class="nav-menu">
+            <a href="{{ url_for('home') }}" class="nav-item">平台首页</a>
+            <a href="{{ url_for('chat') }}" class="nav-item active">智能问诊台</a>
+            <a href="{{ url_for('dashboard') }}" class="nav-item">身体信息评估</a>
+            <a href="{{ url_for('community') }}" class="nav-item">宠主社区</a>
+            <a href="{{ url_for('reminder') }}" class="nav-item">健康提醒</a>
+            <a href="{{ url_for('profile') }}" class="nav-item">个人中心</a>
+        </nav>
+    </aside>
+
+    <main class="main-content">
+        <header class="top-header">
+            <span>数据处理中心 / 身体信息评估</span>
+            <span style="font-size: 13px; font-weight: bold; color: #1a365d;">本地安全网络已连接</span>
+        </header>
+        
+        <section class="content-body">
+            
+            <div id="inputSection">
+                <h2 class="text-center mb-4" style="color: #1e3a8a; font-weight: 800; letter-spacing: 1px;">宠物健康深度评估</h2>
+                <p class="text-center text-muted mb-5">录入基础生化指标与临床体征，决策引擎将生成定制报告。</p>
+
+                <div class="custom-card">
+                    <div class="card-title">基础档案录入</div>
+                    <div class="row g-4">
+                        <div class="col-md-6">
+                            <label class="form-label">* 宠物品类</label>
+                            <select id="pet_type" class="form-select">
+                                <option value="cat">猫科动物 (Feline)</option>
+                                <option value="dog" selected>犬科动物 (Canine)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">* 生命阶段</label>
+                            <select id="age_stage" class="form-select">
+                                <option value="juvenile">幼年期</option>
+                                <option value="adult">成年期</option>
+                                <option value="senior" selected>老年期</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">* 当前体重 (kg)</label>
+                            <input type="number" id="weight" class="form-control" value="12.5" step="0.1">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">* 体态评分 (Body Condition Score)</label>
+                            <select id="bcs" class="form-select">
+                                <option value="thin">偏瘦 (BCS 1-3)</option>
+                                <option value="normal">标准 (BCS 4-5)</option>
+                                <option value="overweight" selected>超重 (BCS 6-7)</option>
+                                <option value="obese">肥胖 (BCS 8-9)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="custom-card">
+                    <div class="card-title d-flex justify-content-between align-items-center">
+                        <span>临床异常体征排查</span>
+                        <span style="font-size: 13px; font-weight: normal; color: #64748b; background: #f1f5f9; padding: 4px 10px; border-radius: 12px;">注：无明显异常则默认收起</span>
+                    </div>
+                    
+                    <div id="diseaseListContainer">
+                        </div>
+                </div>
+
+                <button class="btn-submit" onclick="handleClinicalSubmit()">启动 RAG 深度推理引擎</button>
+            </div>
+
+            <div id="loadingSection" class="custom-card" style="display: none;">
+                <h4 style="color: #2563eb; font-weight: bold;">正在分配算力与连接知识库...</h4>
+                <div class="spinner-border text-primary mt-3" role="status" style="width: 3rem; height: 3rem;"></div>
+                <div class="log-box" id="logBox"></div>
+            </div>
+
+            <div id="resultSection" style="display: none;">
+                <h3 class="text-center mb-4" style="color: #1e3a8a; font-weight: 800;">生化与体征综合评估报告</h3>
+                <div class="row g-4">
+                    <div class="col-md-5">
+                        <div class="custom-card h-100">
+                            <div class="card-title">样本特征</div>
+                            <ul class="info-list mb-4" style="list-style: none; padding: 0; line-height: 2.5;">
+                                <li>物种识别 <span id="res-type">...</span></li>
+                                <li>阶段认定 <span id="res-age">...</span></li>
+                                <li>体重记录 <span id="res-weight">...</span></li>
+                            </ul>
+                            
+                            <div class="card-title mt-4">综合风险定级</div>
+                            <div class="score-circle mt-4">
+                                <div class="num" id="res-score">...</div>
+                                <div class="text">风险预警</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-7">
+                        <div class="custom-card h-100">
+                            <div class="card-title">诊断逻辑解析</div>
+                            <div style="background-color: #fff1f2; border-left: 4px solid #f43f5e; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+                                <span style="font-size: 13px; color:#9f1239;">疑似偏离方向：</span><br>
+                                <strong id="res-disease" style="color:#e11d48; font-size: 18px;">...</strong>
+                            </div>
+                            
+                            <p style="font-size: 14px; color:#475569; line-height: 1.8;"><strong>体征与生化依据：</strong><br><span id="res-evidence" style="color: #0f172a;">...</span></p>
+                            
+                            <div style="background-color: #eff6ff; border: 1px dashed #93c5fd; padding: 15px; border-radius: 8px; font-size: 13px; color: #1e3a8a; margin-top: 20px;">
+                                <strong>系统辅助推理结论：</strong><br> <span id="res-explanation">...</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-12">
+                        <div class="custom-card">
+                            <div class="card-title">处方级干预建议</div>
+                            <div id="res-advice" style="font-size: 14px; color: #334155; line-height: 2;">...</div>
+                            <hr style="border-color: #e2e8f0; margin: 25px 0;">
+                            <div style="display: flex; align-items: center; background: #f8fafc; padding: 20px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                                <div>
+                                    <h5 id="res-product" style="font-weight: bold; color: #1e3a8a; margin-bottom: 8px;">...</h5>
+                                    <p id="res-reason" style="font-size: 13px; color: #64748b; margin: 0;"></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="text-center mt-2 mb-5">
+                    <button class="btn btn-outline-primary px-5 py-2" style="border-radius: 30px;" onclick="location.reload()">↺ 刷新会话上下文</button>
+                </div>
+            </div>
+
+        </section>
+    </main>
+
+    <script src="{{ url_for('static', filename='js/api.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/global_reminder.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/pet_profile_sync.js') }}"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      await loadPostsFromServer();
+});
+
+
+    function syncDashboardBasicInfo() {
+        const currentUser = localStorage.getItem('currentUser');
+        if (!currentUser || !window.PetProfileSync) return;
+
+        window.PetProfileSync.saveFromDashboard(currentUser, {
+            pet_type: document.getElementById('pet_type')?.value || 'dog',
+            age_stage: document.getElementById('age_stage')?.value || 'adult',
+            weight: document.getElementById('weight')?.value || '',
+            bcs: document.getElementById('bcs')?.value || 'normal'
+        });
+    }
+    </script>
+<script>
+async function loadPetProfileToDashboard() {
+    const currentUser = localStorage.getItem('currentUser');
+    if (!currentUser) return;
+
+    try {
+        const res = await fetch(`/api/pet-profile?username=${encodeURIComponent(currentUser)}`);
+        const json = await res.json();
+        const data = (json.code === 200 && json.data) ? json.data : {};
+
+        if (data.pet_type) document.getElementById('pet_type').value = data.pet_type;
+        if (data.age_stage) document.getElementById('age_stage').value = data.age_stage;
+        if (data.weight !== undefined && data.weight !== null && data.weight !== '') {
+            document.getElementById('weight').value = data.weight;
+        }
+        if (data.bcs) document.getElementById('bcs').value = data.bcs;
+    } catch (e) {}
+}
+
+async function syncDashboardBasicInfoToDb() {
+    const currentUser = localStorage.getItem('currentUser');
+    if (!currentUser) return;
+
+    try {
+        await fetch('/api/pet-profile', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                username: currentUser,
+                pet_type: document.getElementById('pet_type')?.value || 'dog',
+                age_stage: document.getElementById('age_stage')?.value || 'adult',
+                weight: document.getElementById('weight')?.value || '',
+                bcs: document.getElementById('bcs')?.value || 'normal'
+            })
+        });
+    } catch (e) {}
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadPetProfileToDashboard();
+});
+</script>
+
+</body>
+</html>

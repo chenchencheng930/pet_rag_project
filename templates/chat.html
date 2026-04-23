@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>智能辅助问诊 - 临床决策平台</title>
+    <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
+    <style>
+        /* 全局基础规范 */
+        body { 
+            margin: 0; 
+            padding: 0; 
+            overflow: hidden; 
+            background-color: #f8fafc; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+        }
+        
+        /* 侧边导航栏 */
+        .sidebar { 
+            position: fixed; 
+            top: 0; 
+            left: 0; 
+            width: 220px; 
+            height: 100vh; 
+            background-color: #1a365d; 
+            color: #e2e8f0; 
+            display: flex; 
+            flex-direction: column; 
+            z-index: 1000; 
+            box-shadow: 2px 0 8px rgba(0,0,0,0.05); 
+        }
+        
+        .sidebar-brand {
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-bottom: 1px solid #2a4365;
+            padding: 0 15px;
+            background-color: #152c4d;
+        }
+
+        .sidebar-brand img {
+            max-width: 100%;
+            max-height: 35px;
+            object-fit: contain;
+        }
+        
+        .nav-menu { padding-top: 15px; }
+        .nav-item { 
+            padding: 14px 20px; 
+            cursor: pointer; 
+            border-left: 3px solid transparent; 
+            color: #94a3b8; 
+            transition: all 0.2s ease; 
+            text-decoration: none; 
+            display: block;
+            font-size: 14px;
+        }
+        .nav-item:hover { background-color: #2a4365; color: #ffffff; }
+        .nav-item.active { 
+            background-color: #2a4365; 
+            color: #ffffff; 
+            border-left-color: #3b82f6; 
+            font-weight: 500; 
+        }
+
+        /* 顶部状态栏 */
+        .top-header { 
+            position: fixed;
+            top: 0;
+            left: 220px;
+            width: calc(100vw - 220px);
+            height: 50px; 
+            background: #ffffff; 
+            border-bottom: 1px solid #e2e8f0; 
+            display: flex; 
+            align-items: center; 
+            justify-content: space-between; 
+            padding: 0 24px; 
+            color: #475569; 
+            font-size: 13px; 
+            z-index: 900;
+        }
+    </style>
+</head>
+<body>
+
+    <aside class="sidebar">
+        <div class="sidebar-brand">
+            <img src="{{ url_for('static', filename='assets/logo.jpg') }}" alt="系统Logo">
+        </div>
+        <nav class="nav-menu">
+            <a href="{{ url_for('home') }}" class="nav-item">平台首页</a>
+            <a href="{{ url_for('chat') }}" class="nav-item active">智能问诊台</a>
+            <a href="{{ url_for('dashboard') }}" class="nav-item">身体信息评估</a>
+            <a href="{{ url_for('community') }}" class="nav-item">宠主社区</a>
+            <a href="{{ url_for('reminder') }}" class="nav-item">健康提醒</a>
+            <a href="{{ url_for('profile') }}" class="nav-item">个人中心</a>
+        </nav>
+    </aside>
+
+    <header class="top-header">
+        <span>工作台 / 智能辅助诊断模块</span>
+        <span style="color: #64748b; font-weight: 500;">引擎状态: 运行中</span>
+    </header>
+
+    <script src="https://lf-cdn.coze.cn/obj/unpkg/flow-platform/chat-app-sdk/1.2.0-beta.19/libs/cn/index.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // 1. 标准化初始化
+            const chatClient = new CozeWebSDK.WebChatClient({
+                config: { 
+                    bot_id: '7612248366939897906' 
+                },
+                componentProps: { 
+                    title: '临床诊断助手',
+                    layout: 'pc'
+                },
+                auth: {
+                    type: 'token',
+                    token: 'pat_hgwXfq3JZgWOSHK2bPVEvLpm3vqcCkBMSgyNcQyql3UY5qjPOqEGrOvZlqP4RnEN',
+                    onRefreshToken: function () { 
+                        return 'pat_hgwXfq3JZgWOSHK2bPVEvLpm3vqcCkBMSgyNcQyql3UY5qjPOqEGrOvZlqP4RnEN';
+                    }
+                }
+            });
+
+            // 2. 延迟触发打开面板
+            setTimeout(() => {
+                if (chatClient.showChatBot) {
+                    chatClient.showChatBot();
+                }
+            }, 800);
+
+            // 3. 安全的布局覆写脚本（只针对 iframe，不误杀其他元素）
+            setInterval(() => {
+                const iframes = document.querySelectorAll('iframe');
+                iframes.forEach(iframe => {
+                    if (iframe.src.includes('coze') || iframe.id.includes('coze')) {
+                        iframe.style.setProperty('position', 'fixed', 'important');
+                        iframe.style.setProperty('top', '50px', 'important');
+                        iframe.style.setProperty('left', '220px', 'important');
+                        iframe.style.setProperty('width', 'calc(100vw - 220px)', 'important');
+                        iframe.style.setProperty('height', 'calc(100vh - 50px)', 'important');
+                        iframe.style.setProperty('z-index', '9999', 'important');
+                        iframe.style.setProperty('max-width', 'none', 'important');
+                        iframe.style.setProperty('max-height', 'none', 'important');
+                        iframe.style.setProperty('border', 'none', 'important');
+                        iframe.style.setProperty('border-radius', '0', 'important');
+                        
+                        let parent = iframe.parentElement;
+                        while(parent && parent.tagName !== 'BODY') {
+                            parent.style.setProperty('transform', 'none', 'important');
+                            parent = parent.parentElement;
+                        }
+                    }
+                });
+
+                // 安全隐藏原形悬浮入口按钮
+                document.querySelectorAll('body > div').forEach(div => {
+                    const style = window.getComputedStyle(div);
+                    if (style.position === 'fixed' && parseInt(style.width) < 100) {
+                        if (!div.querySelector('iframe')) {
+                            div.style.setProperty('display', 'none', 'important');
+                        }
+                    }
+                });
+            }, 300);
+        });
+    </script>
+<script src="{{ url_for('static', filename='js/global_reminder.js') }}"></script>
+</body>
+</html>

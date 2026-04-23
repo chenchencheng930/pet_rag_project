@@ -1,0 +1,103 @@
+/* 文件位置：css/dashboard.css */
+/* 临床评估模块专属样式 */
+
+.content-body {
+    padding: 30px 20px;
+    max-width: 800px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+.custom-card {
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+    padding: 30px;
+    margin-bottom: 25px;
+    border: 1px solid #eff6ff;
+}
+
+.card-title {
+    font-size: 18px;
+    font-weight: bold;
+    color: #1e3a8a;
+    margin-bottom: 25px;
+    border-bottom: 2px solid #eff6ff;
+    padding-bottom: 12px;
+    display: flex;
+    align-items: center;
+}
+
+.card-title::before {
+    content: '';
+    display: inline-block;
+    width: 4px;
+    height: 18px;
+    background-color: #3b82f6;
+    margin-right: 10px;
+    border-radius: 2px;
+}
+
+.btn-submit {
+    background-color: #2563eb;
+    color: white;
+    border: none;
+    padding: 15px;
+    border-radius: 8px;
+    font-size: 18px;
+    font-weight: bold;
+    transition: 0.3s;
+    width: 100%;
+    margin-top: 10px;
+    margin-bottom: 40px;
+}
+
+.btn-submit:hover {
+    background-color: #1d4ed8;
+    box-shadow: 0 6px 15px rgba(37,99,235,0.3);
+}
+
+.disease-item {
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 15px 20px;
+    margin-bottom: 15px;
+    background-color: #f8fafc;
+    transition: 0.2s;
+}
+
+.disease-details {
+    background-color: #fff;
+    border: 1px dashed #93c5fd;
+    border-radius: 8px;
+    padding: 20px;
+    margin-top: 15px;
+}
+
+.log-box {
+    background: #0f172a;
+    color: #38bdf8;
+    font-family: monospace;
+    text-align: left;
+    padding: 20px;
+    border-radius: 8px;
+    height: 200px;
+    overflow-y: hidden;
+    margin: 30px auto;
+    max-width: 600px;
+    font-size: 14px;
+}
+
+.score-circle {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    background-color: #fee2e2;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #ef4444;
+    border: 4px solid #fecaca;
+}

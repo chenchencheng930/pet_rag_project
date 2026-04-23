@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>宠物档案 - 临床决策平台</title>
+    <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/common.css') }}" rel="stylesheet">
+    <style>
+        body { margin: 0; display: flex; min-height: 100vh; background: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #1e293b; }
+        .sidebar { width: 220px; background-color: #1a365d; color: #e2e8f0; display: flex; flex-direction: column; box-shadow: 2px 0 10px rgba(0,0,0,0.05); flex-shrink: 0; }
+        .sidebar-brand { height: 60px; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid #2a4365; padding: 0 15px; background-color: #152c4d; }
+        .sidebar-brand img { max-width: 100%; max-height: 35px; object-fit: contain; }
+        .nav-item { padding: 14px 20px; cursor: pointer; border-left: 3px solid transparent; color: #94a3b8; transition: all 0.2s ease; text-decoration: none; display: block; font-size: 14px; }
+        .nav-item:hover { background-color: #2a4365; color: #ffffff; }
+        .nav-item.active { background-color: #2a4365; color: #ffffff; border-left-color: #3b82f6; font-weight: 500; }
+        .main-content { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+        .top-header { background: #ffffff; min-height: 50px; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: space-between; padding: 0 24px; color: #475569; font-size: 13px; }
+        .page-shell { width: 100%; max-width: 1180px; margin: 0 auto; padding: 28px 20px 36px; }
+        .hero-card { position: relative; overflow: hidden; background: linear-gradient(135deg, #ffffff 0%, #eef4ff 100%); border: 1px solid #dbeafe; border-radius: 20px; padding: 28px; box-shadow: 0 10px 30px rgba(30, 58, 138, 0.06); margin-bottom: 24px; }
+        .hero-badge { display: inline-flex; align-items: center; gap: 8px; background: rgba(37, 99, 235, 0.08); color: #1d4ed8; border-radius: 999px; padding: 6px 12px; font-size: 12px; font-weight: 600; margin-bottom: 14px; }
+        .hero-title { font-size: 28px; font-weight: 800; margin: 0 0 8px; color: #153e75; letter-spacing: .5px; }
+        .hero-subtitle { font-size: 14px; color: #64748b; max-width: 720px; line-height: 1.7; margin: 0; }
+        .content-grid { display: grid; grid-template-columns: 1.2fr .8fr; gap: 20px; }
+        .card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 18px; box-shadow: 0 6px 20px rgba(15, 23, 42, 0.04); overflow: hidden; }
+        .card-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 22px 16px; border-bottom: 1px solid #eff6ff; }
+        .card-title { display: flex; align-items: center; gap: 10px; margin: 0; font-size: 18px; color: #1e3a8a; font-weight: 700; }
+        .title-bar { width: 4px; height: 22px; border-radius: 999px; background: #3b82f6; display: inline-block; }
+        .card-subtext { font-size: 12px; color: #94a3b8; }
+        .card-body { padding: 20px 22px 22px; }
+        .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+        .field-group { display: flex; flex-direction: column; gap: 8px; }
+        .field-group.full { grid-column: 1 / -1; }
+        .field-label { font-size: 13px; color: #334155; font-weight: 600; }
+        .field-label span { color: #ef4444; margin-right: 4px; }
+        .form-control, .form-select, textarea { width: 100%; min-height: 46px; border: 1px solid #cbd5e1; border-radius: 12px; padding: 10px 14px; font-size: 14px; color: #1e293b; background: #ffffff; outline: none; transition: all .2s ease; box-sizing: border-box; }
+        textarea { min-height: 110px; resize: vertical; }
+        .form-control:focus, .form-select:focus, textarea:focus { border-color: #60a5fa; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.08); }
+        .button-row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 22px; }
+        .btn-primary, .btn-secondary { border: none; border-radius: 12px; padding: 12px 20px; font-size: 14px; font-weight: 700; cursor: pointer; transition: all .2s ease; }
+        .btn-primary { background: linear-gradient(90deg, #2563eb, #3b82f6); color: #ffffff; box-shadow: 0 10px 20px rgba(37, 99, 235, 0.18); }
+        .btn-secondary { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+        .summary-panel { display: flex; flex-direction: column; gap: 16px; }
+        .profile-badge { background: linear-gradient(135deg, #1d4ed8, #60a5fa); border-radius: 18px; padding: 22px; color: white; position: relative; overflow: hidden; }
+        .profile-badge::after { content: ""; position: absolute; right: -30px; top: -30px; width: 120px; height: 120px; border-radius: 50%; background: rgba(255,255,255,.12); }
+        .badge-small { font-size: 12px; opacity: .9; margin-bottom: 8px; }
+        .badge-name { font-size: 24px; font-weight: 800; margin-bottom: 8px; }
+        .badge-meta { font-size: 13px; line-height: 1.7; opacity: .95; }
+        .chips { display: flex; gap: 10px; flex-wrap: wrap; }
+        .chip { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 999px; background: #eff6ff; color: #1d4ed8; font-size: 12px; font-weight: 700; }
+        .metric-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+        .metric-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 16px; }
+        .metric-label { font-size: 12px; color: #64748b; margin-bottom: 8px; }
+        .metric-value { font-size: 18px; font-weight: 800; color: #0f172a; }
+        .tips-box { background: #fffdf5; border: 1px solid #fde68a; border-radius: 14px; padding: 16px; }
+        .tips-title { font-size: 14px; color: #92400e; font-weight: 700; margin-bottom: 8px; }
+        .tips-text { font-size: 13px; line-height: 1.8; color: #a16207; margin: 0; }
+        .save-status { font-size: 12px; color: #16a34a; min-height: 18px; margin-top: 12px; }
+        @media (max-width: 980px) { .content-grid { grid-template-columns: 1fr; } }
+        @media (max-width: 768px) {
+            body { display: block; }
+            .sidebar { display: none; }
+            .top-header { padding: 12px; height: auto; font-size: 12px; }
+            .page-shell { padding: 16px 12px 24px; }
+            .hero-title { font-size: 22px; }
+            .form-grid, .metric-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <aside class="sidebar">
+        <div class="sidebar-brand">
+            <img src="{{ url_for('static', filename='assets/logo.jpg') }}" alt="系统Logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+            <span style="display:none;color:#fff;font-size:18px;font-weight:bold;">一宠一配方</span>
+        </div>
+        <nav class="nav-menu">
+            <a href="{{ url_for('home') }}" class="nav-item">平台首页</a>
+            <a href="{{ url_for('chat') }}" class="nav-item">智能问诊台</a>
+            <a href="{{ url_for('dashboard') }}" class="nav-item">深度健康评估</a>
+            <a href="{{ url_for('community') }}" class="nav-item">宠主社区</a>
+            <a href="{{ url_for('reminder') }}" class="nav-item">健康提醒</a>
+            <a href="{{ url_for('profile') }}" class="nav-item active">个人中心</a>
+        </nav>
+    </aside>
+
+    <main class="main-content">
+        <header class="top-header">
+            <span>工作台 / 个人中心 / 宠物档案</span>
+            <span style="color:#64748b;font-weight:500;">与评估页基础档案结构实时同步</span>
+        </header>
+
+        <section class="page-shell">
+            <div class="hero-card">
+                <div class="hero-badge">● 实时同步档案</div>
+                <h1 class="hero-title">宠物基础档案</h1>
+                <p class="hero-subtitle">该页面与健康评估顶部“基础档案录入”字段保持同源：宠物品类、生命阶段、当前体重、体态评分会双向同步。你在这里修改后，进入评估页会自动带出；在评估页调整后，回到这里也会刷新为最新记录。</p>
+            </div>
+
+            <div class="content-grid">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title"><span class="title-bar"></span>档案编辑</h2>
+                        <div class="card-subtext">字段与评估页顶部保持一致</div>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-grid">
+                            <div class="field-group">
+                                <label class="field-label"><span>*</span>宠物昵称</label>
+                                <input id="pet_name" class="form-control" placeholder="例如：Lucky / 七七">
+                            </div>
+                            <div class="field-group">
+                                <label class="field-label">性别</label>
+                                <select id="pet_gender" class="form-select">
+                                    <option value="unknown">未填写</option>
+                                    <option value="male">公</option>
+                                    <option value="female">母</option>
+                                </select>
+                            </div>
+                            <div class="field-group">
+                                <label class="field-label"><span>*</span>宠物品类</label>
+                                <select id="pet_type" class="form-select">
+                                    <option value="cat">猫科动物 (Feline)</option>
+                                    <option value="dog">犬科动物 (Canine)</option>
+                                </select>
+                            </div>
+                            <div class="field-group">
+                                <label class="field-label"><span>*</span>生命阶段</label>
+                                <select id="age_stage" class="form-select">
+                                    <option value="juvenile">幼年期</option>
+                                    <option value="adult">成年期</option>
+                                    <option value="senior">老年期</option>
+                                </select>
+                            </div>
+                            <div class="field-group">
+                                <label class="field-label"><span>*</span>当前体重 (kg)</label>
+                                <input id="weight" type="number" step="0.1" class="form-control" placeholder="例如 12.5">
+                            </div>
+                            <div class="field-group">
+                                <label class="field-label"><span>*</span>体态评分 (Body Condition Score)</label>
+                                <select id="bcs" class="form-select">
+                                    <option value="thin">偏瘦 (BCS 1-3)</option>
+                                    <option value="normal">标准 (BCS 4-5)</option>
+                                    <option value="overweight">超重 (BCS 6-7)</option>
+                                    <option value="obese">肥胖 (BCS 8-9)</option>
+                                </select>
+                            </div>
+                            <div class="field-group">
+                                <label class="field-label">绝育状态</label>
+                                <select id="sterilized" class="form-select">
+                                    <option value="unknown">未填写</option>
+                                    <option value="yes">已绝育</option>
+                                    <option value="no">未绝育</option>
+                                </select>
+                            </div>
+                            <div class="field-group">
+                                <label class="field-label">最近更新时间</label>
+                                <input id="updated_at" class="form-control" disabled>
+                            </div>
+                            <div class="field-group full">
+                                <label class="field-label">档案备注</label>
+                                <textarea id="profile_notes" placeholder="可以记录既往病史、喂养习惯、过敏情况或近期观察到的异常表现。"></textarea>
+                            </div>
+                        </div>
+
+                        <div class="button-row">
+                            <button class="btn-primary" type="button" onclick="savePetProfile()">保存档案</button>
+                            <button class="btn-secondary" type="button" onclick="loadPetProfile(true)">重新读取最新数据</button>
+                        </div>
+                        <div class="save-status" id="saveStatus"></div>
+                    </div>
+                </div>
+
+                <div class="summary-panel">
+                    <div class="profile-badge">
+                        <div class="badge-small">实时档案摘要</div>
+                        <div class="badge-name" id="summary_name">未命名宠物</div>
+                        <div class="badge-meta" id="summary_meta">请先填写基础档案信息。</div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h2 class="card-title"><span class="title-bar"></span>关键信息速览</h2>
+                            <div class="card-subtext">用于评估页首屏回显</div>
+                        </div>
+                        <div class="card-body">
+                            <div class="chips" id="summary_chips"></div>
+                            <div class="metric-grid" style="margin-top:16px;">
+                                <div class="metric-card">
+                                    <div class="metric-label">当前体重</div>
+                                    <div class="metric-value" id="summary_weight">--</div>
+                                </div>
+                                <div class="metric-card">
+                                    <div class="metric-label">体态评分</div>
+                                    <div class="metric-value" id="summary_bcs">--</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tips-box">
+                        <div class="tips-title">同步说明</div>
+                        <p class="tips-text">
+                            1. 当前版本使用同一份本地档案键值实现“宠物档案页 ⇄ 健康评估页”的双向同步。<br>
+                            2. 若你在评估页修改了基础档案并提交，回到本页点击“重新读取最新数据”即可同步展示。<br>
+                            3. 后续接数据库时，只需要把同名字段替换为后端接口读写即可。
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="{{ url_for('static', filename='js/pet_profile_sync.js') }}"></script>
+    <script>
+        function currentUserKey() {
+            const currentUser = localStorage.getItem('currentUser');
+            if (!currentUser) {
+                alert("请先登录再查看宠物档案。");
+                window.location.href = "{{ url_for('login') }}";
+                return null;
+            }
+            return currentUser;
+        }
+
+        function setValue(id, value) {
+            const el = document.getElementById(id);
+            if (el) el.value = value ?? "";
+        }
+
+        function getValue(id) {
+            const el = document.getElementById(id);
+            return el ? el.value : "";
+        }
+
+        function buildProfileObject() {
+            return {
+                pet_name: getValue("pet_name"),
+                pet_gender: getValue("pet_gender"),
+                pet_type: getValue("pet_type"),
+                age_stage: getValue("age_stage"),
+                weight: getValue("weight"),
+                bcs: getValue("bcs"),
+                sterilized: getValue("sterilized"),
+                profile_notes: getValue("profile_notes"),
+                updated_at: new Date().toLocaleString()
+            };
+        }
+
+        function fillForm(data) {
+            setValue("pet_name", data.pet_name || "");
+            setValue("pet_gender", data.pet_gender || "unknown");
+            setValue("pet_type", data.pet_type || "dog");
+            setValue("age_stage", data.age_stage || "adult");
+            setValue("weight", data.weight || "");
+            setValue("bcs", data.bcs || "normal");
+            setValue("sterilized", data.sterilized || "unknown");
+            setValue("updated_at", data.updated_at || "尚未保存");
+            setValue("profile_notes", data.profile_notes || "");
+            renderSummary(data);
+        }
+
+        function labelMap() {
+            return {
+                pet_type: { dog: "犬科动物", cat: "猫科动物" },
+                age_stage: { juvenile: "幼年期", adult: "成年期", senior: "老年期" },
+                bcs: {
+                    thin: "偏瘦 (BCS 1-3)",
+                    normal: "标准 (BCS 4-5)",
+                    overweight: "超重 (BCS 6-7)",
+                    obese: "肥胖 (BCS 8-9)"
+                },
+                pet_gender: { male: "公", female: "母", unknown: "未填写" },
+                sterilized: { yes: "已绝育", no: "未绝育", unknown: "未填写" }
+            };
+        }
+
+        function renderSummary(data) {
+            const map = labelMap();
+            document.getElementById("summary_name").innerText = data.pet_name || "未命名宠物";
+            document.getElementById("summary_meta").innerText =
+                `${map.pet_type[data.pet_type || "dog"]} · ${map.age_stage[data.age_stage || "adult"]} · ${map.pet_gender[data.pet_gender || "unknown"]}`;
+
+            document.getElementById("summary_weight").innerText = data.weight ? `${data.weight} kg` : "--";
+            document.getElementById("summary_bcs").innerText = map.bcs[data.bcs || "normal"] || "--";
+
+            const chips = [
+                map.pet_type[data.pet_type || "dog"],
+                map.age_stage[data.age_stage || "adult"],
+                map.bcs[data.bcs || "normal"],
+                map.sterilized[data.sterilized || "unknown"]
+            ];
+
+            document.getElementById("summary_chips").innerHTML = chips
+                .map(item => `<span class="chip">${item}</span>`)
+                .join("");
+        }
+
+        async function loadPetProfile(showNotice) {
+                const currentUser = currentUserKey();
+                if (!currentUser) return;
+
+                try {
+                    const res = await fetch(`/api/pet-profile?username=${encodeURIComponent(currentUser)}`);
+                    const json = await res.json();
+                    const data = (json.code === 200 && json.data) ? json.data : {};
+                    fillForm(data || {});
+
+                    if (showNotice) {
+                        document.getElementById("saveStatus").innerText = "已读取最新档案数据";
+                        setTimeout(() => {
+                            document.getElementById("saveStatus").innerText = "";
+                        }, 1800);
+                    }
+                } catch (e) {
+                    document.getElementById("saveStatus").innerText = "读取档案失败";
+                }
+            }
+
+
+        async function savePetProfile() {
+            const currentUser = currentUserKey();
+            if (!currentUser) return;
+
+            const profile = buildProfileObject();
+
+            try {
+                const res = await fetch('/api/pet-profile', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: currentUser,
+                        ...profile
+                    })
+                });
+
+                const json = await res.json();
+                if (json.code !== 200) {
+                    document.getElementById("saveStatus").innerText = json.message || "保存失败";
+                    return;
+                }
+
+                fillForm({ ...profile });
+                document.getElementById("saveStatus").innerText = "宠物档案已保存到数据库";
+                setTimeout(() => {
+                    document.getElementById("saveStatus").innerText = "";
+                }, 2400);
+            } catch (e) {
+                document.getElementById("saveStatus").innerText = "保存失败";
+            }
+        }
+
+
+        document.addEventListener("DOMContentLoaded", () => {
+            loadPetProfile(false);
+            ["pet_name","pet_gender","pet_type","age_stage","weight","bcs","sterilized","profile_notes"].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.addEventListener("input", () => renderSummary(buildProfileObject()));
+                    el.addEventListener("change", () => renderSummary(buildProfileObject()));
+                }
+            });
+        });
+
+        window.addEventListener("storage", (event) => {
+            if (event.key && event.key.startsWith("pet_profile_")) {
+                loadPetProfile(false);
+            }
+        });
+    </script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"45c2bf8136a245cd97f1c2e9a96c0730","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+</body>
+</html>

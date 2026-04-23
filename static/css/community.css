@@ -1,0 +1,236 @@
+/* * 宠主社区视图核心样式 (Community View Styles)
+ * 依赖: common.css, bootstrap.min.css
+ */
+
+.community-wrapper {
+    max-width: 800px;
+    margin: 0 auto;
+    width: 100%;
+    padding: 20px;
+}
+
+/* 内容发布器 (Publisher Component) */
+.publisher-card {
+    background-color: #ffffff;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 24px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.03);
+    border: 1px solid #e2e8f0;
+}
+
+.publisher-input {
+    width: 100%;
+    min-height: 80px;
+    border: none;
+    resize: none;
+    outline: none;
+    font-size: 15px;
+    color: #334155;
+    line-height: 1.6;
+}
+
+.publisher-input::placeholder {
+    color: #94a3b8;
+}
+
+.publisher-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #f1f5f9;
+}
+
+.toolbar-actions {
+    display: flex;
+    gap: 15px;
+}
+
+.tool-btn {
+    color: #64748b;
+    font-size: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    transition: color 0.2s;
+}
+
+.tool-btn:hover {
+    color: #3b82f6;
+}
+
+.btn-publish {
+    background-color: #1a73e8;
+    color: #ffffff;
+    border: none;
+    padding: 8px 24px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.btn-publish:hover {
+    background-color: #1557b0;
+}
+
+/* 动态信息流 (Feed Stream) */
+.feed-item {
+    background-color: #ffffff;
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 16px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+    border: 1px solid #e2e8f0;
+    transition: box-shadow 0.2s;
+}
+
+.feed-item:hover {
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.05);
+}
+
+/* 用户信息头 */
+.feed-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.author-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background-color: #e2e8f0;
+    margin-right: 12px;
+    object-fit: cover;
+}
+
+.author-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.author-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: #1e293b;
+    margin-bottom: 2px;
+}
+
+.author-meta {
+    font-size: 12px;
+    color: #94a3b8;
+    display: flex;
+    gap: 10px;
+}
+
+.pet-tag {
+    background-color: #f1f5f9;
+    color: #475569;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+}
+
+/* 帖子内容 */
+.feed-content {
+    font-size: 15px;
+    color: #334155;
+    line-height: 1.7;
+    margin-bottom: 16px;
+    word-break: break-word;
+}
+
+/* 交互底栏 (Actions) */
+.feed-footer {
+    display: flex;
+    gap: 24px;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid #f8fafc;
+}
+
+.interaction-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #64748b;
+    font-size: 13px;
+    cursor: pointer;
+    transition: color 0.2s;
+    user-select: none;
+}
+
+.interaction-btn.active {
+    color: #1a73e8;
+    font-weight: 500;
+}
+
+.interaction-btn:hover {
+    color: #1a73e8;
+}
+
+/* 文件位置：css/community.css */
+
+.community-wrapper { max-width: 800px; margin: 0 auto; width: 100%; padding: 20px; }
+.publisher-card { background-color: #ffffff; border-radius: 12px; padding: 20px; margin-bottom: 24px; box-shadow: 0 2px 12px rgba(0, 0, 0, 0.03); border: 1px solid #e2e8f0; }
+.publisher-input { width: 100%; min-height: 80px; border: none; resize: none; outline: none; font-size: 15px; color: #334155; line-height: 1.6; }
+.publisher-input::placeholder { color: #94a3b8; }
+.publisher-toolbar { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; padding-top: 12px; border-top: 1px solid #f1f5f9; }
+.toolbar-actions { display: flex; align-items: center; gap: 15px; }
+.tool-btn { color: #64748b; font-size: 14px; cursor: pointer; display: flex; align-items: center; transition: color 0.2s; }
+.tool-btn:hover { color: #3b82f6; }
+.btn-publish { background-color: #1a73e8; color: #ffffff; border: none; padding: 8px 24px; border-radius: 20px; font-size: 14px; font-weight: 500; cursor: pointer; transition: background-color 0.2s; }
+.btn-publish:hover { background-color: #1557b0; }
+
+.feed-item { background-color: #ffffff; border-radius: 12px; padding: 24px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02); border: 1px solid #e2e8f0; transition: box-shadow 0.2s; }
+.feed-item:hover { box-shadow: 0 6px 16px rgba(0, 0, 0, 0.05); }
+.feed-header { display: flex; align-items: center; margin-bottom: 16px; }
+.author-avatar { width: 44px; height: 44px; border-radius: 50%; background-color: #e2e8f0; margin-right: 12px; object-fit: cover; }
+.author-info { display: flex; flex-direction: column; }
+.author-name { font-size: 15px; font-weight: 600; color: #1e293b; margin-bottom: 2px; }
+.author-meta { font-size: 12px; color: #94a3b8; display: flex; gap: 10px; }
+.pet-tag { background-color: #f1f5f9; color: #475569; padding: 2px 6px; border-radius: 4px; font-size: 11px; }
+.feed-content { font-size: 15px; color: #334155; line-height: 1.7; margin-bottom: 16px; word-break: break-word; }
+.feed-footer { display: flex; gap: 24px; margin-top: 16px; padding-top: 16px; border-top: 1px solid #f8fafc; }
+.interaction-btn { display: flex; align-items: center; gap: 6px; color: #64748b; font-size: 13px; cursor: pointer; transition: color 0.2s; user-select: none; }
+.interaction-btn.active { color: #1a73e8; font-weight: 500; }
+.interaction-btn:hover { color: #1a73e8; }
+
+/* 新增：图像预览与控制区样式 */
+.preview-container { margin-top: 10px; padding: 10px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; display: inline-block; }
+.preview-container img { max-height: 120px; border-radius: 6px; display: block; }
+.remove-btn { display: block; text-align: center; font-size: 12px; color: #ef4444; margin-top: 8px; cursor: pointer; }
+.remove-btn:hover { text-decoration: underline; }
+
+/* 新增：话题选择器与标签样式 */
+.topic-select { border: none; background: #f1f5f9; color: #475569; padding: 6px 12px; border-radius: 15px; font-size: 13px; outline: none; cursor: pointer; }
+.topic-tag { display: inline-block; color: #1a73e8; font-weight: 500; margin-right: 8px; }
+.feed-image { max-width: 100%; max-height: 300px; border-radius: 8px; margin-top: 12px; border: 1px solid #e2e8f0; display: block; }
+
+
+/* 自定义话题输入框样式 */
+.topic-custom-input {
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+    color: #475569;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 13px;
+    outline: none;
+    width: 160px;
+    transition: all 0.2s ease;
+}
+
+.topic-custom-input::placeholder {
+    color: #94a3b8;
+}
+
+.topic-custom-input:focus {
+    background: #ffffff;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
