@@ -1,14 +1,42 @@
-from flask import Flask, jsonify, request, render_template
-
 from rule_filter import apply_rules
 from recommender import build_assessment_result
 from assessment_engine import AssessmentEngine
 from rag_engine import RagEngine
 from db import get_db_connection
 from followup_agent import should_ask_followup, generate_followup_questions, merge_followup_answers
+import re
+from flask import Flask, jsonify, request, render_template, redirect, url_for, session
+from werkzeug.security import generate_password_hash, check_password_hash
+import traceback
+
 
 app = Flask(__name__)
-import traceback
+app.secret_key = "replace-with-a-real-secret"
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=False,
+)
+
+
+def ensure_user_phone_column():
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
+            cursor.execute("SHOW COLUMNS FROM users LIKE 'phone'")
+            if not cursor.fetchone():
+                cursor.execute("ALTER TABLE users ADD COLUMN phone VARCHAR(20) UNIQUE NULL")
+                conn.commit()
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        print("Warning: cannot ensure users.phone column:", e)
+    finally:
+        if conn:
+            conn.close()
+
+ensure_user_phone_column()
 
 assessment_engine = AssessmentEngine()
 rag_engine = RagEngine()
@@ -43,7 +71,10 @@ def db_test():
 
 @app.route("/")
 def home():
+    if not session.get("user_id"):
+        return redirect(url_for("login"))
     return render_template("index.html")
+
 
 
 @app.route("/chat")
@@ -83,6 +114,215 @@ def my_pets():
 @app.route("/login")
 def login():
     return render_template("login.html")
+def valid_phone(phone):
+    return re.fullmatch(r"1\d{10}", phone or "") is not None
+
+@app.route("/api/register", methods=["POST"])
+def api_register():
+    conn = None
+    try:
+        data = request.get_json(silent=True) or {}
+        phone = (data.get("phone") or "").strip()
+        username = (data.get("username") or "").strip()
+        password = (data.get("password") or "").strip()
+
+        if not phone or not username or not password:
+            return jsonify({"code": 400, "message": "手机号、用户名、密码不能为空"}), 400
+        if not valid_phone(phone):
+            return jsonify({"code": 400, "message": "请输入正确的11位手机号"}), 400
+
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "SELECT id FROM users WHERE phone=%s OR username=%s",
+                (phone, username)
+            )
+            existed = cursor.fetchone()
+            if existed:
+                return jsonify({"code": 400, "message": "手机号或用户名已存在"}), 400
+
+            password_hash = generate_password_hash(password)
+            cursor.execute(
+                "INSERT INTO users (phone, username, password) VALUES (%s, %s, %s)",
+                (phone, username, password_hash)
+            )
+            user_id = cursor.lastrowid
+
+        conn.commit()
+        session["user_id"] = user_id
+        session["username"] = username
+        session["phone"] = phone
+        session.permanent = True
+        return jsonify({"code": 200, "message": "注册成功", "data": {"id": user_id, "username": username, "phone": phone}})
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        return jsonify({"code": 500, "message": "注册失败", "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route("/api/login", methods=["POST"])
+def api_login():
+    conn = None
+    try:
+        data = request.get_json(silent=True) or {}
+        phone = (data.get("phone") or "").strip()
+        password = (data.get("password") or "").strip()
+
+        if not phone or not password:
+            return jsonify({"code": 400, "message": "手机号和密码不能为空"}), 400
+
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "SELECT id, phone, username, password FROM users WHERE phone=%s OR username=%s",
+                (phone, phone)
+            )
+            user = cursor.fetchone()
+
+        if not user or not check_password_hash(user["password"], password):
+            return jsonify({"code": 400, "message": "手机号或密码错误"}), 400
+
+        session["user_id"] = user["id"]
+        session["username"] = user["username"]
+        session["phone"] = user["phone"]
+        session.permanent = True
+        return jsonify({
+            "code": 200,
+            "message": "登录成功",
+            "data": {
+                "id": user["id"],
+                "username": user["username"],
+                "phone": user["phone"]
+            }
+        })
+    except Exception as e:
+        return jsonify({"code": 500, "message": "登录失败", "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route("/api/me", methods=["GET"])
+def api_me():
+    user_id = session.get("user_id")
+    if not user_id:
+        return jsonify({"code": 401, "message": "未登录"}), 401
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "SELECT id, username, phone FROM users WHERE id=%s",
+                (user_id,)
+            )
+            user = cursor.fetchone()
+
+        if not user:
+            session.clear()
+            return jsonify({"code": 401, "message": "用户不存在"}), 401
+
+        phone = user["phone"]
+        masked_phone = phone[:3] + "****" + phone[-4:] if phone and len(phone) >= 11 else phone
+
+        return jsonify({
+            "code": 200,
+            "message": "success",
+            "data": {
+                "id": user["id"],
+                "username": user["username"],
+                "phone": phone,
+                "masked_phone": masked_phone
+            }
+        })
+    except Exception as e:
+        return jsonify({"code": 500, "message": "获取用户信息失败", "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route("/api/account/security", methods=["POST"])
+def api_account_security():
+    user_id = session.get("user_id")
+    if not user_id:
+        return jsonify({"code": 401, "message": "未登录"}), 401
+
+    data = request.get_json(silent=True) or {}
+    old_password = (data.get("old_password") or "").strip()
+    new_password = (data.get("new_password") or "").strip()
+    new_phone = (data.get("new_phone") or "").strip()
+
+    if not old_password:
+        return jsonify({"code": 400, "message": "请输入当前密码验证身份"}), 400
+    if not new_phone and not new_password:
+        return jsonify({"code": 400, "message": "请填写要更新的新手机号或新密码"}), 400
+    if new_phone and not valid_phone(new_phone):
+        return jsonify({"code": 400, "message": "请输入正确的11位手机号"}), 400
+    if new_password and len(new_password) < 8:
+        return jsonify({"code": 400, "message": "新密码长度至少8位"}), 400
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "SELECT phone, password FROM users WHERE id=%s",
+                (user_id,)
+            )
+            user = cursor.fetchone()
+            if not user:
+                session.clear()
+                return jsonify({"code": 401, "message": "用户不存在"}), 401
+
+            if not check_password_hash(user["password"], old_password):
+                return jsonify({"code": 400, "message": "当前密码不正确"}), 400
+
+            updates = []
+            params = []
+
+            if new_phone and new_phone != user["phone"]:
+                cursor.execute(
+                    "SELECT id FROM users WHERE phone=%s AND id<>%s",
+                    (new_phone, user_id)
+                )
+                if cursor.fetchone():
+                    return jsonify({"code": 400, "message": "该手机号已被其他账号使用"}), 400
+                updates.append("phone=%s")
+                params.append(new_phone)
+
+            if new_password:
+                updates.append("password=%s")
+                params.append(generate_password_hash(new_password))
+
+            if updates:
+                params.append(user_id)
+                cursor.execute(
+                    f"UPDATE users SET {', '.join(updates)} WHERE id=%s",
+                    tuple(params)
+                )
+
+        conn.commit()
+        if new_phone:
+            session["phone"] = new_phone
+        return jsonify({"code": 200, "message": "更新成功"})
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        return jsonify({"code": 500, "message": "账户安全更新失败", "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route("/api/logout", methods=["POST"])
+def api_logout():
+    session.clear()
+    return jsonify({"code": 200, "message": "已退出登录"})
+
 
 @app.route("/api/pet-profile", methods=["GET"])
 def get_pet_profile():

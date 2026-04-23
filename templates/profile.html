@@ -182,19 +182,24 @@
             </div>
             <div class="modal-body">
                 <div class="form-group">
-                    <label class="form-label">绑定手机号</label>
-                    <input type="text" class="form-control" value="138****5678" disabled style="background: #f1f5f9; color:#94a3b8;">
+                    <label class="form-label">当前绑定手机号</label>
+                    <input type="text" id="securityPhone" class="form-control" value="" disabled style="background: #f1f5f9; color:#94a3b8;">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">新绑定手机号</label>
+                    <input type="text" id="newPhone" class="form-control" placeholder="输入新手机号">
                 </div>
                 <hr style="border-color: #f1f5f9; margin: 20px 0;">
                 <div class="form-group">
-                    <label class="form-label">原密码</label>
-                    <input type="password" class="form-control" placeholder="输入当前密码">
+                    <label class="form-label">当前密码</label>
+                    <input type="password" id="currentPassword" class="form-control" placeholder="输入当前密码">
                 </div>
                 <div class="form-group">
                     <label class="form-label">新密码</label>
-                    <input type="password" class="form-control" placeholder="输入新密码 (至少8位)">
+                    <input type="password" id="newPassword" class="form-control" placeholder="输入新密码 (至少8位)">
                 </div>
-                <button class="btn-save" onclick="alert('密码修改成功，请重新登录。'); closeModal('securityModal');">保存修改</button>
+                <div id="securityMessage" class="alert-message" style="display: none;"></div>
+                <button class="btn-save" onclick="saveAccountSecurity()">保存修改</button>
             </div>
         </div>
     </div>
@@ -272,45 +277,117 @@
 
     <script>
         const DEFAULT_AVATAR = "{{ url_for('static', filename='assets/default_avatar.png') }}";
+        let currentProfileUser = "";
 
-        document.addEventListener('DOMContentLoaded', () => {
-            const currentUser = localStorage.getItem('currentUser');
-            if (!currentUser) {
-                alert("为保证数据安全，请先完成身份鉴权。");
-                window.location.href = "{{ url_for('login') }}";
-                return;
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const response = await fetch('/api/me', {
+                    credentials: 'include'
+                });
+                const userNameDisplay = document.getElementById('userNameDisplay');
+                const userStatusDisplay = document.getElementById('userStatusDisplay');
+
+                if (!response.ok) {
+                    userNameDisplay.innerText = '未登录访客';
+                    userStatusDisplay.innerHTML = '<a href="{{ url_for("login") }}" style="color:#1a73e8;text-decoration:none;">点击登录</a>，获取完整临床决策支持功能';
+                    document.getElementById('userAvatar').src = DEFAULT_AVATAR;
+                    return;
+                }
+
+                const result = await response.json();
+                const user = result.data;
+                currentProfileUser = user.username;
+                localStorage.setItem('currentUser', user.username);
+
+                userNameDisplay.innerText = user.username;
+                userStatusDisplay.innerText = '系统认证用户 · 已绑定手机号：' + user.masked_phone;
+                document.getElementById('securityPhone').value = user.masked_phone;
+                document.getElementById('userAvatar').src = DEFAULT_AVATAR;
+                document.getElementById('logoutSection').style.display = 'block';
+
+                const savedAvatar = localStorage.getItem(`avatar_${currentProfileUser}`);
+                if (savedAvatar) {
+                    document.getElementById('userAvatar').src = savedAvatar;
+                }
+            } catch (e) {
+                document.getElementById('userNameDisplay').innerText = '未登录访客';
+                document.getElementById('userStatusDisplay').innerHTML = '<a href="{{ url_for("login") }}" style="color:#1a73e8;text-decoration:none;">点击登录</a>，获取完整临床决策支持功能';
+                document.getElementById('userAvatar').src = DEFAULT_AVATAR;
             }
-            
-            document.getElementById('userNameDisplay').innerText = currentUser;
-            document.getElementById('userStatusDisplay').innerText = '系统认证用户 · 权限级别：标准授权';
-            
-            const avatarImg = document.getElementById('userAvatar');
-            const savedAvatar = localStorage.getItem(`avatar_${currentUser}`);
-            if (savedAvatar) {
-                avatarImg.src = savedAvatar;
-            } else {
-                avatarImg.src = DEFAULT_AVATAR;
-            }
-            
-            document.getElementById('avatarWrapper').style.display = 'block';
-            document.getElementById('logoutSection').style.display = 'block';
         });
 
         function handleAvatarUpload(event) {
             const file = event.target.files[0];
-            const currentUser = localStorage.getItem('currentUser');
-            
-            if (file && currentUser) {
+            if (file && currentProfileUser) {
                 const reader = new FileReader();
                 reader.onload = function(e) {
                     const base64Image = e.target.result;
                     document.getElementById('userAvatar').src = base64Image;
-                    localStorage.setItem(`avatar_${currentUser}`, base64Image);
+                    localStorage.setItem(`avatar_${currentProfileUser}`, base64Image);
                 };
                 reader.readAsDataURL(file);
             }
         }
 
+        function openModal(id) {
+            const el = document.getElementById(id);
+            if (el) el.classList.add('active');
+        }
+
+        function closeModal(id) {
+            const el = document.getElementById(id);
+            if (el) el.classList.remove('active');
+        }
+
+        async function saveAccountSecurity() {
+            const oldPassword = document.getElementById('currentPassword').value.trim();
+            const newPassword = document.getElementById('newPassword').value.trim();
+            const newPhone = document.getElementById('newPhone').value.trim();
+            const messageEl = document.getElementById('securityMessage');
+
+            messageEl.style.display = 'none';
+            messageEl.innerText = '';
+
+            if (!oldPassword) {
+                messageEl.innerText = '请输入当前密码进行验证';
+                messageEl.style.display = 'block';
+                return;
+            }
+            if (!newPhone && !newPassword) {
+                messageEl.innerText = '请填写新的手机号或新密码';
+                messageEl.style.display = 'block';
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/account/security', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        old_password: oldPassword,
+                        new_phone: newPhone || undefined,
+                        new_password: newPassword || undefined
+                    })
+                });
+
+                const result = await response.json();
+                messageEl.innerText = result.message || (response.ok ? '更新成功' : '更新失败');
+                messageEl.style.display = 'block';
+                messageEl.style.color = response.ok ? '#16a34a' : '#ef4444';
+
+                if (response.ok && result.code === 200) {
+                    document.getElementById('currentPassword').value = '';
+                    document.getElementById('newPassword').value = '';
+                    document.getElementById('newPhone').value = '';
+                    setTimeout(() => closeModal('securityModal'), 800);
+                }
+            } catch (error) {
+                messageEl.innerText = '网络异常，请稍后重试';
+                messageEl.style.display = 'block';
+                messageEl.style.color = '#ef4444';
+            }
+        }
 
         function triggerCaseFileUpload() {
             document.getElementById('caseFileInput').click();
@@ -319,51 +396,28 @@
         function handleCaseFileUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
-
-            const currentUser = localStorage.getItem('currentUser') || 'guest';
-            const key = `case_files_${currentUser}`;
-            const oldList = JSON.parse(localStorage.getItem(key) || '[]');
-
-            oldList.push({
-                id: Date.now(),
-                file_name: file.name,
-                created_at: new Date().toLocaleString()
-            });
-
-            localStorage.setItem(key, JSON.stringify(oldList));
-            alert(`已归档：${file.name}`);
+            alert(`已选择文件：${file.name}`);
         }
 
-
-
-        function handleLogout() {
-            if(confirm("执行此操作将清除当前浏览器的会话状态，确认继续吗？")) {
+        async function handleLogout() {
+            if (confirm('确认退出当前登录状态吗？')) {
+                await fetch('/api/logout', {
+                    method: 'POST',
+                    credentials: 'include'
+                });
                 localStorage.removeItem('currentUser');
-                window.location.href = "{{ url_for('login') }}"; 
-            }
-        }
-
-        function openModal(modalId) {
-            document.getElementById(modalId).classList.add('active');
-        }
-
-        function closeModal(modalId) {
-            document.getElementById(modalId).classList.remove('active');
-        }
-
-        window.onclick = function(event) {
-            if (event.target.classList.contains('modal-overlay')) {
-                event.target.classList.remove('active');
+                window.location.href = "{{ url_for('login') }}";
             }
         }
     </script>
+
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"45c2bf8136a245cd97f1c2e9a96c0730","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script src="{{ url_for('static', filename='js/global_reminder.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pet_profile_sync.js') }}"></script>
 <script>
 function syncDashboardBasicInfo() {
-    const currentUser = localStorage.getItem('currentUser');
+    const currentUser = currentProfileUser || localStorage.getItem('currentUser');
     if (!currentUser || !window.PetProfileSync) return;
 
     window.PetProfileSync.saveFromDashboard(currentUser, {
@@ -375,12 +429,14 @@ function syncDashboardBasicInfo() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    const currentUser = localStorage.getItem('currentUser');
+    const currentUser = currentProfileUser || localStorage.getItem('currentUser');
     if (currentUser && window.PetProfileSync) {
         window.PetProfileSync.fillDashboardForm(currentUser);
     }
 });
 </script>
 
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"45c2bf8136a245cd97f1c2e9a96c0730","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
 </html>
