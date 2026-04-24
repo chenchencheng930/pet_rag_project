@@ -633,7 +633,7 @@ def api_account_username():
 
     # 只限制明显会破坏显示/数据库的特殊控制字符，不限制 emoji。
     if re.search(r"[<>\"'\\\\/]", new_username):
-        return jsonify({"code": 400, "message": "用户名不能包含特殊符号 < > \\" ' \\\\ /"}), 400
+        return jsonify({"code": 400, "message": "用户名不能包含特殊符号 < > 引号 反斜杠 斜杠"}), 400
 
     conn = None
     try:
@@ -1190,7 +1190,7 @@ def create_community_post():
 
         if not content:
             return jsonify({"code": 400, "message": "帖子内容不能为空"}), 400
-conn = get_db_connection()
+        conn = get_db_connection()
         with conn.cursor() as cursor:
             cursor.execute(
                 """
@@ -1236,7 +1236,7 @@ def create_community_comment():
             return jsonify({"code": 400, "message": "post_id 不能为空"}), 400
         if not content and not image_url:
             return jsonify({"code": 400, "message": "评论内容或图片不能为空"}), 400
-conn = get_db_connection()
+        conn = get_db_connection()
         with conn.cursor() as cursor:
             cursor.execute("SELECT id, user_id, author_name FROM community_posts WHERE id=%s", (post_id,))
             post = cursor.fetchone()
