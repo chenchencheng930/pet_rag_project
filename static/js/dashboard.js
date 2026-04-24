@@ -1,10 +1,3 @@
-
-// 文件位置：js/dashboard.js
-/**
- * 健康评估业务逻辑控制器 (Controller)
- * 负责动态渲染体征表单、收集用户输入、以及处理诊断流动画
- */
-
 // 临床医学指标配置 (Data Dictionary)
 
 const CLINICAL_CONFIG = {
