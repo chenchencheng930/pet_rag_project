@@ -1,6 +1,3 @@
-let pendingAssessmentPayload = null;
-let originalResultSectionHtml = "";
-
 
 // 文件位置：js/dashboard.js
 /**
@@ -122,7 +119,7 @@ async function handleClinicalSubmit() {
         }
     });
 
-    const primary_concern = selectedConcerns.length > 0 ? selectedConcerns[0] : 'unknown';
+    const primary_concern = selectedConcerns.length > 0 ? selectedConcerns : ['unknown'];
 
     // 构建发往后端的 Payload
     const payload = {
@@ -143,7 +140,7 @@ async function handleClinicalSubmit() {
     const logBox = document.getElementById('logBox');
     const diagnosticLogs = [
         "[INFO] System initialized. Captured clinical data matrix.",
-        "[PROCESSING] Rule-Engine routing primary concern: " + primary_concern.toUpperCase(),
+        "[PROCESSING] Rule-Engine routing selected concerns: " + primary_concern.join(", ").toUpperCase(),
         "[RAG-FETCH] Querying vector database for veterinary guidelines...",
         "[AGENT] RAG extraction complete. Initializing LLM inference...",
         "[AGENT] Generating targeted medical and nutritional strategy...",
@@ -169,12 +166,6 @@ async function handleClinicalSubmit() {
         ]);
 
         let resultData = null;
-
-        if (response && response.code === 210) {
-            pendingAssessmentPayload = payload;
-            renderFollowupQuestions(response.data.questions);
-            return;
-        }
 
         if (response && response.code === 200) {
             resultData = response.data;
@@ -205,73 +196,6 @@ async function handleClinicalSubmit() {
         location.reload();
     }
 }
-function renderFollowupQuestions(questions) {
-    document.getElementById('loadingSection').style.display = 'none';
-
-    let html = `
-        <div id="followupSection" class="custom-card">
-            <h4 style="color:#1e3a8a;font-weight:bold;margin-bottom:20px;">补充追问</h4>
-            <p style="color:#64748b;margin-bottom:20px;">为提高判断准确性，请再补充以下信息：</p>
-    `;
-
-    questions.forEach((q, index) => {
-        html += `
-            <div style="margin-bottom:18px;">
-                <label style="display:block;font-weight:600;margin-bottom:8px;">${index + 1}. ${q.question}</label>
-                <select class="form-select followup-answer" data-key="${q.key}">
-                    <option value="">请选择</option>
-                    ${q.options.map(opt => `<option value="${opt}">${opt}</option>`).join("")}
-                </select>
-            </div>
-        `;
-    });
-
-    html += `
-            <button class="btn-submit" onclick="submitFollowupAnswers()">提交补充信息</button>
-        </div>
-    `;
-
-    document.getElementById('resultSection').style.display = 'block';
-    document.getElementById('resultSection').innerHTML = html;
-}
-
-async function submitFollowupAnswers() {
-    const answers = {};
-    document.querySelectorAll('.followup-answer').forEach(el => {
-        if (el.value) {
-            answers[el.dataset.key] = el.value;
-        }
-    });
-
-    const secondPayload = {
-        ...pendingAssessmentPayload,
-        followup_answers: answers
-    };
-
-    document.getElementById('resultSection').style.display = 'none';
-    document.getElementById('loadingSection').style.display = 'block';
-
-    try {
-        const response = await ApiService.fetchAssessment(secondPayload);
-        if (response && response.code === 200) {
-             document.getElementById('loadingSection').style.display = 'none';
-
-             const resultSection = document.getElementById('resultSection');
-             resultSection.innerHTML = originalResultSectionHtml;
-             resultSection.style.display = 'block';
-
-             renderResultView(response.data);
-        } else {
-             alert('追问提交失败，请重试');
-             location.reload();
-        }
-    } catch (e) {
-        alert('追问提交失败，请重试');
-        location.reload();
-    }
-}
-
-
 function renderResultView(d) {
     document.getElementById('loadingSection').style.display = 'none';
     document.getElementById('resultSection').style.display = 'block';
@@ -281,35 +205,50 @@ function renderResultView(d) {
     document.getElementById('res-weight').innerText = d.summary.weight + ' kg';
 
     if (d.suspected_conditions && d.suspected_conditions.length > 0) {
-        const condition = d.suspected_conditions[0];
+        const conditions = d.suspected_conditions;
 
-        document.getElementById('res-disease').innerText = condition.condition_name || '综合健康评估';
-        document.getElementById('res-evidence').innerText = (condition.evidence || []).join('、');
+        document.getElementById('res-disease').innerText = conditions
+            .map(condition => condition.condition_name || '综合健康评估')
+            .join(' / ');
 
-        // 把原来空话式 explanation 改成更专业的组合说明
-        const explanationParts = [];
+        document.getElementById('res-evidence').innerText = conditions
+            .map(condition => {
+                const name = condition.condition_name || '综合健康评估';
+                const evidence = (condition.evidence || []).join('、') || '暂无明确证据';
+                return `【${name}】${evidence}`;
+            })
+            .join('\n');
 
-        if (condition.clinical_summary) {
-            explanationParts.push(`【临床摘要】${condition.clinical_summary}`);
-        }
+        const allExplanationParts = [];
 
-        if (condition.risk_interpretation) {
-            explanationParts.push(`【风险解读】${condition.risk_interpretation}`);
-        }
+        conditions.forEach((condition, index) => {
+            const title = condition.condition_name || `方向${index + 1}`;
+            const parts = [];
 
-        if (condition.nutrition_focus) {
-            explanationParts.push(`【营养重点】${condition.nutrition_focus}`);
-        }
+            if (condition.clinical_summary) {
+                parts.push(`【临床摘要】${condition.clinical_summary}`);
+            }
 
-        if (condition.follow_up) {
-            explanationParts.push(`【后续建议】${condition.follow_up}`);
-        }
+            if (condition.risk_interpretation) {
+                parts.push(`【风险解读】${condition.risk_interpretation}`);
+            }
 
-        // 如果后端还没返回新字段，就退回 explanation
-        document.getElementById('res-explanation').innerText =
-            explanationParts.length > 0
-                ? explanationParts.join('\n')
-                : (condition.explanation || '暂无进一步评估说明');
+            if (condition.nutrition_focus) {
+                parts.push(`【营养重点】${condition.nutrition_focus}`);
+            }
+
+            if (condition.follow_up) {
+                parts.push(`【后续建议】${condition.follow_up}`);
+            }
+
+            if (parts.length > 0) {
+                allExplanationParts.push(`【${title}】\n${parts.join('\n')}`);
+            } else {
+                allExplanationParts.push(`【${title}】\n${condition.explanation || '暂无进一步评估说明'}`);
+            }
+        });
+
+        document.getElementById('res-explanation').innerText = allExplanationParts.join('\n\n');
     }
 
     if (d.overall_risk_level === 'high') {
@@ -330,9 +269,22 @@ function renderResultView(d) {
         `<strong style="color:#1e3a8a;">医疗干预方案：</strong><br> ${d.health_advice.join('<br>')}<br><br>` +
         `<strong style="color:#1e3a8a;">营养调理方向：</strong><br> ${d.diet_advice.join('<br>')}`;
 
-    document.getElementById('res-product').innerText =
-        d.product_recommendations?.[0]?.product_name || '暂无推荐产品';
+    const products = d.product_recommendations || [];
 
-    document.getElementById('res-reason').innerText =
-        d.product_recommendations?.[0]?.reason?.join(' | ') || '暂无推荐理由';
+    if (products.length > 0) {
+        document.getElementById('res-product').innerText = products
+            .map(item => item.product_name || '未识别具体产品')
+            .join(' / ');
+
+        document.getElementById('res-reason').innerText = products
+            .map(item => {
+                const name = item.product_name || '推荐产品';
+                const reason = (item.reason || []).join(' | ') || '暂无推荐理由';
+                return `【${name}】${reason}`;
+            })
+            .join('\n');
+    } else {
+        document.getElementById('res-product').innerText = '暂无推荐产品';
+        document.getElementById('res-reason').innerText = '暂无推荐理由';
+    }
 }

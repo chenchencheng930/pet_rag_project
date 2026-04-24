@@ -8,6 +8,7 @@ const ApiService = {
     async fetchAssessment(payload) {
         const response = await fetch('/assessment', {
             method: 'POST',
+            credentials: 'include',
             headers: {
                 'Content-Type': 'application/json'
             },
