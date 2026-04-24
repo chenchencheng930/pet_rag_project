@@ -1,3 +1,7 @@
+from flask import Flask, jsonify, request, render_template
+import traceback
+import os
+import requests
 from rule_filter import apply_rules
 from recommender import build_assessment_result
 from assessment_engine import AssessmentEngine
@@ -7,16 +11,22 @@ from followup_agent import should_ask_followup, generate_followup_questions, mer
 import re
 from flask import Flask, jsonify, request, render_template, redirect, url_for, session
 from werkzeug.security import generate_password_hash, check_password_hash
-import traceback
+from dotenv import load_dotenv
 
 
 app = Flask(__name__)
-app.secret_key = "replace-with-a-real-secret"
+load_dotenv()
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "replace-with-a-real-secret")
+
+COZE_BOT_ID = os.getenv("COZE_BOT_ID")
+COZE_API_TOKEN = os.getenv("COZE_API_TOKEN")
+
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
-    SESSION_COOKIE_SECURE=False,
+    SESSION_COOKIE_SECURE=False,   # 本地开发先 False，https 部署再改 True
 )
+
 
 
 def ensure_user_phone_column():
@@ -71,6 +81,7 @@ def db_test():
 
 @app.route("/")
 def home():
+    print("home session user_id =", session.get("user_id"))
     if not session.get("user_id"):
         return redirect(url_for("login"))
     return render_template("index.html")
@@ -79,7 +90,97 @@ def home():
 
 @app.route("/chat")
 def chat():
+    if not session.get("user_id"):
+        return redirect(url_for("login"))
     return render_template("chat.html")
+
+
+
+
+@app.route("/api/chat", methods=["POST"])
+def api_chat():
+    user_id = session.get("user_id")
+    username = session.get("username")
+
+    if not user_id:
+        return jsonify({"code": 401, "message": "未登录"}), 401
+
+    if not COZE_BOT_ID or not COZE_API_TOKEN:
+        return jsonify({"code": 500, "message": "Coze 配置缺失，请检查 .env 中的 COZE_BOT_ID 和 COZE_API_TOKEN"}), 500
+
+    data = request.get_json(silent=True) or {}
+    query = (data.get("query") or "").strip()
+
+    if not query:
+        return jsonify({"code": 400, "message": "query 不能为空"}), 400
+
+    headers = {
+        "Authorization": f"Bearer {COZE_API_TOKEN}",
+        "Content-Type": "application/json"
+    }
+
+    payload = {
+        "bot_id": COZE_BOT_ID,
+        "user_id": str(user_id),
+        "additional_messages": [
+            {
+                "role": "user",
+                "content": query,
+                "content_type": "text"
+            }
+        ]
+    }
+
+    try:
+        resp = requests.post(
+            "https://api.coze.cn/v3/chat",
+            headers=headers,
+            json=payload,
+            timeout=60
+        )
+
+        try:
+            result = resp.json()
+        except Exception:
+            return jsonify({
+                "code": 500,
+                "message": "Coze 返回的不是合法 JSON",
+                "raw": resp.text
+            }), 500
+
+        if resp.status_code != 200:
+            return jsonify({
+                "code": resp.status_code,
+                "message": "Coze 请求失败",
+                "data": result
+            }), resp.status_code
+
+        answer = ""
+        data_block = result.get("data") or {}
+
+        if isinstance(data_block, dict):
+            messages = data_block.get("messages") or []
+            for item in messages:
+                if item.get("type") == "answer" and item.get("content"):
+                    answer = item.get("content")
+                    break
+
+            if not answer and data_block.get("answer"):
+                answer = data_block.get("answer")
+
+        if not answer:
+            answer = result.get("msg") or "未获取到模型回复"
+
+        return jsonify({
+            "code": 200,
+            "message": "success",
+            "data": {
+                "answer": answer,
+                "raw": result
+            }
+        })
+    except requests.RequestException as e:
+        return jsonify({"code": 500, "message": "调用 Coze 失败", "error": str(e)}), 500
 
 
 @app.route("/dashboard")
@@ -189,6 +290,7 @@ def api_login():
         session["username"] = user["username"]
         session["phone"] = user["phone"]
         session.permanent = True
+        print("login success, session user_id =", session.get("user_id"))
         return jsonify({
             "code": 200,
             "message": "登录成功",

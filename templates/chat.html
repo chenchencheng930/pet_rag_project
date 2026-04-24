@@ -2,172 +2,234 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>智能辅助问诊 - 临床决策平台</title>
-    <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
     <style>
-        /* 全局基础规范 */
-        body { 
-            margin: 0; 
-            padding: 0; 
-            overflow: hidden; 
-            background-color: #f8fafc; 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #f8fafc;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }
-        
-        /* 侧边导航栏 */
-        .sidebar { 
-            position: fixed; 
-            top: 0; 
-            left: 0; 
-            width: 220px; 
-            height: 100vh; 
-            background-color: #1a365d; 
-            color: #e2e8f0; 
-            display: flex; 
-            flex-direction: column; 
-            z-index: 1000; 
-            box-shadow: 2px 0 8px rgba(0,0,0,0.05); 
+
+        /* 左侧导航栏 */
+        .sidebar {
+            position: fixed;
+            top: 0; left: 0;
+            width: 220px;
+            height: 100vh;
+            background-color: #1a365d;
+            color: #e2e8f0;
+            display: flex;
+            flex-direction: column;
+            z-index: 10000;
+            box-shadow: 2px 0 8px rgba(0,0,0,0.05);
         }
-        
         .sidebar-brand {
             height: 60px;
             display: flex;
             align-items: center;
             justify-content: center;
             border-bottom: 1px solid #2a4365;
-            padding: 0 15px;
             background-color: #152c4d;
+            font-size: 18px;
+            font-weight: 500;
         }
-
-        .sidebar-brand img {
-            max-width: 100%;
-            max-height: 35px;
-            object-fit: contain;
-        }
-        
         .nav-menu { padding-top: 15px; }
-        .nav-item { 
-            padding: 14px 20px; 
-            cursor: pointer; 
-            border-left: 3px solid transparent; 
-            color: #94a3b8; 
-            transition: all 0.2s ease; 
-            text-decoration: none; 
+        .nav-item {
+            padding: 14px 20px;
+            cursor: pointer;
+            border-left: 3px solid transparent;
+            color: #94a3b8;
+            transition: all 0.2s ease;
+            text-decoration: none;
             display: block;
             font-size: 14px;
         }
         .nav-item:hover { background-color: #2a4365; color: #ffffff; }
-        .nav-item.active { 
-            background-color: #2a4365; 
-            color: #ffffff; 
-            border-left-color: #3b82f6; 
-            font-weight: 500; 
+        .nav-item.active {
+            background-color: #2a4365;
+            color: #ffffff;
+            border-left-color: #3b82f6;
+            font-weight: 500;
         }
 
-        /* 顶部状态栏 */
-        .top-header { 
+        /* 右侧聊天整体容器 */
+        #chat-wrapper {
             position: fixed;
-            top: 0;
-            left: 220px;
-            width: calc(100vw - 220px);
-            height: 50px; 
-            background: #ffffff; 
-            border-bottom: 1px solid #e2e8f0; 
-            display: flex; 
-            align-items: center; 
-            justify-content: space-between; 
-            padding: 0 24px; 
-            color: #475569; 
-            font-size: 13px; 
-            z-index: 900;
+            top: 0; left: 220px;
+            width: calc(100vw - 220px); height: 100vh;
+            display: flex; flex-direction: column;
+            background: #fff; z-index: 999;
+        }
+        /* 诊断助手抬头 */
+        .chat-header {
+            background: #1e40af;
+            color: white;
+            padding: 16px 24px;
+            font-size: 18px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .chat-header span {
+            background: rgba(255,255,255,0.2);
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 400;
+        }
+        /* 消息区域 */
+        .chat-messages {
+            flex: 1; overflow-y: auto; padding: 20px;
+            display: flex; flex-direction: column; gap: 12px;
+            scroll-behavior: smooth;
+        }
+        .message {
+            max-width: 80%; padding: 10px 15px;
+            border-radius: 12px; line-height: 1.5;
+            word-wrap: break-word; white-space: pre-wrap;
+        }
+        .user-message {
+            align-self: flex-end; background: #3b82f6;
+            color: white; border-bottom-right-radius: 2px;
+        }
+        .bot-message {
+            align-self: flex-start; background: #f1f5f9;
+            color: #333; border-bottom-left-radius: 2px;
+        }
+        .loading {
+            align-self: flex-start;
+            color: #666; font-style: italic; padding: 10px 15px;
+        }
+        /* 底部输入区 */
+        .chat-input-area {
+            display: flex; padding: 15px 20px;
+            border-top: 1px solid #e2e8f0; background: #f8fafc;
+        }
+        .chat-input-area textarea {
+            flex: 1; padding: 10px 15px;
+            border: 1px solid #cbd5e1; border-radius: 8px;
+            resize: none; font-size: 14px; line-height: 1.4;
+            font-family: inherit; outline: none;
+        }
+        .chat-input-area textarea:focus { border-color: #3b82f6; }
+        .chat-input-area button {
+            padding: 10px 25px; margin-left: 10px;
+            background: #3b82f6; color: white;
+            border: none; border-radius: 8px;
+            font-size: 14px; font-weight: 500; cursor: pointer;
+            white-space: nowrap; transition: background 0.2s;
+        }
+        .chat-input-area button:hover { background: #2563eb; }
+        .chat-input-area button:disabled {
+            background: #94a3b8; cursor: not-allowed;
         }
     </style>
 </head>
 <body>
-
     <aside class="sidebar">
-        <div class="sidebar-brand">
-            <img src="{{ url_for('static', filename='assets/logo.jpg') }}" alt="系统Logo">
-        </div>
+        <div class="sidebar-brand">临床决策平台</div>
         <nav class="nav-menu">
             <a href="{{ url_for('home') }}" class="nav-item">平台首页</a>
             <a href="{{ url_for('chat') }}" class="nav-item active">智能问诊台</a>
-            <a href="{{ url_for('dashboard') }}" class="nav-item">身体信息评估</a>
+            <a href="{{ url_for('dashboard') }}" class="nav-item">深度健康评估</a>
             <a href="{{ url_for('community') }}" class="nav-item">宠主社区</a>
             <a href="{{ url_for('reminder') }}" class="nav-item">健康提醒</a>
             <a href="{{ url_for('profile') }}" class="nav-item">个人中心</a>
         </nav>
     </aside>
 
-    <header class="top-header">
-        <span>工作台 / 智能辅助诊断模块</span>
-        <span style="color: #64748b; font-weight: 500;">引擎状态: 运行中</span>
-    </header>
+    <div id="chat-wrapper">
+        <div class="chat-header">
+            临床诊断助手 <span>AI 辅助问诊</span>
+        </div>
+        <div id="chat-messages" class="chat-messages">
+            <div class="message bot-message">您好，我是临床诊断助手，请问有什么可以帮您？</div>
+        </div>
+        <div class="chat-input-area">
+            <textarea id="user-input" rows="1" placeholder="输入您的问题..."></textarea>
+            <button id="send-button">发送</button>
+        </div>
+    </div>
 
-    <script src="https://lf-cdn.coze.cn/obj/unpkg/flow-platform/chat-app-sdk/1.2.0-beta.19/libs/cn/index.js"></script>
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            // 1. 标准化初始化
-            const chatClient = new CozeWebSDK.WebChatClient({
-                config: { 
-                    bot_id: '7612248366939897906' 
-                },
-                componentProps: { 
-                    title: '临床诊断助手',
-                    layout: 'pc'
-                },
-                auth: {
-                    type: 'token',
-                    token: 'pat_hgwXfq3JZgWOSHK2bPVEvLpm3vqcCkBMSgyNcQyql3UY5qjPOqEGrOvZlqP4RnEN',
-                    onRefreshToken: function () { 
-                        return 'pat_hgwXfq3JZgWOSHK2bPVEvLpm3vqcCkBMSgyNcQyql3UY5qjPOqEGrOvZlqP4RnEN';
-                    }
-                }
-            });
+    const chatMessages = document.getElementById('chat-messages');
+    const userInput = document.getElementById('user-input');
+    const sendButton = document.getElementById('send-button');
 
-            // 2. 延迟触发打开面板
-            setTimeout(() => {
-                if (chatClient.showChatBot) {
-                    chatClient.showChatBot();
-                }
-            }, 800);
+    function createMessageElement(sender) {
+        const div = document.createElement('div');
+        div.classList.add('message', sender + '-message');
+        chatMessages.appendChild(div);
+        return div;
+    }
 
-            // 3. 安全的布局覆写脚本（只针对 iframe，不误杀其他元素）
-            setInterval(() => {
-                const iframes = document.querySelectorAll('iframe');
-                iframes.forEach(iframe => {
-                    if (iframe.src.includes('coze') || iframe.id.includes('coze')) {
-                        iframe.style.setProperty('position', 'fixed', 'important');
-                        iframe.style.setProperty('top', '50px', 'important');
-                        iframe.style.setProperty('left', '220px', 'important');
-                        iframe.style.setProperty('width', 'calc(100vw - 220px)', 'important');
-                        iframe.style.setProperty('height', 'calc(100vh - 50px)', 'important');
-                        iframe.style.setProperty('z-index', '9999', 'important');
-                        iframe.style.setProperty('max-width', 'none', 'important');
-                        iframe.style.setProperty('max-height', 'none', 'important');
-                        iframe.style.setProperty('border', 'none', 'important');
-                        iframe.style.setProperty('border-radius', '0', 'important');
-                        
-                        let parent = iframe.parentElement;
-                        while(parent && parent.tagName !== 'BODY') {
-                            parent.style.setProperty('transform', 'none', 'important');
-                            parent = parent.parentElement;
-                        }
-                    }
-                });
+    function scrollToBottom() {
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
 
-                // 安全隐藏原形悬浮入口按钮
-                document.querySelectorAll('body > div').forEach(div => {
-                    const style = window.getComputedStyle(div);
-                    if (style.position === 'fixed' && parseInt(style.width) < 100) {
-                        if (!div.querySelector('iframe')) {
-                            div.style.setProperty('display', 'none', 'important');
-                        }
-                    }
-                });
-            }, 300);
+    async function requestConversation(query) {
+        const response = await fetch('/api/chat', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query })
         });
-    </script>
-<script src="{{ url_for('static', filename='js/global_reminder.js') }}"></script>
+
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || result.code !== 200) {
+            throw new Error(result.message || `HTTP ${response.status}`);
+        }
+
+        return result.data.answer || '（未收到回复）';
+    }
+
+    async function handleSend() {
+        const query = userInput.value.trim();
+        if (!query) return;
+
+        const userMsgDiv = createMessageElement('user');
+        userMsgDiv.textContent = query;
+        userInput.value = '';
+        scrollToBottom();
+        setLoading(true);
+
+        const assistantDiv = createMessageElement('bot');
+        assistantDiv.textContent = '正在思考，请稍候...';
+        scrollToBottom();
+
+        try {
+            const answer = await requestConversation(query);
+            assistantDiv.textContent = answer;
+        } catch (error) {
+            console.error('聊天请求错误:', error);
+            assistantDiv.textContent = `抱歉，出错: ${error.message}`;
+        } finally {
+            setLoading(false);
+            scrollToBottom();
+        }
+    }
+
+    function setLoading(isLoading) {
+        sendButton.disabled = isLoading;
+        userInput.disabled = isLoading;
+        sendButton.textContent = isLoading ? '发送中...' : '发送';
+    }
+
+    sendButton.addEventListener('click', handleSend);
+    userInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleSend();
+        }
+    });
+</script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"45c2bf8136a245cd97f1c2e9a96c0730","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
 </html>
