@@ -673,75 +673,7 @@ def api_account_username():
         if conn:
             conn.close()
 
-@app.route("/api/account/username", methods=["POST"])
-def api_account_username():
-    user_id = session.get("user_id")
-    if not user_id:
-        return jsonify({"code": 401, "message": "未登录"}), 401
 
-    data = request.get_json(silent=True) or {}
-    new_username = (data.get("username") or "").strip()
-
-    if not new_username:
-        return jsonify({"code": 400, "message": "用户名不能为空"}), 400
-
-    if len(new_username) < 2 or len(new_username) > 20:
-        return jsonify({"code": 400, "message": "用户名长度需为 2-20 个字符"}), 400
-
-    # 不禁 emoji，只禁明显会破坏 HTML/路径/SQL 显示的字符
-    if re.search(r"[<>\"'\\/]", new_username):
-        return jsonify({"code": 400, "message": "用户名不能包含 < > 引号 斜杠 反斜杠"}), 400
-
-    conn = None
-    try:
-        conn = get_db_connection()
-        with conn.cursor() as cursor:
-            cursor.execute(
-                "SELECT id FROM users WHERE username=%s AND id<>%s",
-                (new_username, user_id)
-            )
-            if cursor.fetchone():
-                return jsonify({"code": 400, "message": "该用户名已被占用"}), 400
-
-            cursor.execute(
-                "UPDATE users SET username=%s WHERE id=%s",
-                (new_username, user_id)
-            )
-
-            # 同步历史帖子和评论里的显示名
-            cursor.execute(
-                "UPDATE community_posts SET author_name=%s WHERE user_id=%s",
-                (new_username, user_id)
-            )
-            cursor.execute(
-                "UPDATE community_comments SET author_name=%s WHERE user_id=%s",
-                (new_username, user_id)
-            )
-
-        conn.commit()
-
-        session["username"] = new_username
-
-        return jsonify({
-            "code": 200,
-            "message": "用户名已更新",
-            "data": {
-                "username": new_username
-            }
-        })
-
-    except Exception as e:
-        if conn:
-            conn.rollback()
-        return jsonify({
-            "code": 500,
-            "message": "用户名更新失败",
-            "error": str(e)
-        }), 500
-
-    finally:
-        if conn:
-            conn.close()
 
 
 @app.route("/api/account/security", methods=["POST"])
