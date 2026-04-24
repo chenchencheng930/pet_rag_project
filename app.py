@@ -48,7 +48,6 @@ def ensure_user_phone_column():
             conn.close()
 
 ensure_user_phone_column()
-ensure_community_schema()
 
 assessment_engine = AssessmentEngine()
 rag_engine = RagEngine()
@@ -213,6 +212,8 @@ def create_notification(cursor, user_id, actor_user_id, actor_name, post_id, com
     )
 
 
+
+ensure_community_schema()
 
 @app.route("/db-test", methods=["GET"])
 def db_test():
