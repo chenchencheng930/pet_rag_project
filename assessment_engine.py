@@ -4,6 +4,10 @@ from config import CONDITION_NAME_MAP, RISK_LEVEL_RULES
 class AssessmentEngine:
     def assess(self, user_info: dict) -> dict:
         condition_results = []
+        selected_concerns = user_info.get("primary_concerns") or user_info.get("user_selected_concerns") or []
+        if isinstance(selected_concerns, str):
+            selected_concerns = [selected_concerns]
+        selected_concerns = [item for item in selected_concerns if item and item != "unknown"]
 
         kidney_result = self.assess_kidney(user_info)
         if kidney_result:
@@ -60,21 +64,54 @@ class AssessmentEngine:
 
         condition_results.sort(key=lambda x: x["score"], reverse=True)
 
-        display_results = [
-            item for item in condition_results
-            if item["risk_level"] in ["medium", "high"]
-        ]
+        result_by_key = {
+            item["condition_key"]: item
+            for item in condition_results
+            if item.get("condition_key")
+        }
+
+        display_results = []
+
+        # 1. 用户主动勾选的方向必须进入评估结果。
+        # 即使该方向当前分数较低，也作为“已选择关注方向/待排查方向”展示，避免多选时只显示第一个方向。
+        for key in selected_concerns:
+            if key in result_by_key:
+                item = dict(result_by_key[key])
+                if item.get("score", 0) < RISK_LEVEL_RULES["medium"]:
+                    item["risk_level"] = "low"
+                    item["evidence"] = item.get("evidence") or ["用户主动选择该关注方向"]
+                    item["explanation"] = (
+                        item.get("explanation")
+                        or f"用户已选择“{CONDITION_NAME_MAP.get(key, key)}”作为关注方向，当前输入证据有限，建议结合更多症状和检查指标继续判断。"
+                    )
+                display_results.append(item)
+            elif key in CONDITION_NAME_MAP:
+                display_results.append({
+                    "condition_key": key,
+                    "condition_name": CONDITION_NAME_MAP[key],
+                    "score": 0,
+                    "risk_level": "low",
+                    "evidence": ["用户主动选择该关注方向"],
+                    "explanation": f"用户已选择“{CONDITION_NAME_MAP.get(key, key)}”作为关注方向，当前输入信息不足以形成中高风险判断，建议结合相关症状和检查指标继续评估。"
+                })
+
+        # 2. 同时保留评分系统识别出的中高风险方向。
+        for item in condition_results:
+            if item["risk_level"] in ["medium", "high"] and item["condition_key"] not in [r["condition_key"] for r in display_results]:
+                display_results.append(item)
 
         if not display_results:
             display_results = condition_results[:1]
 
         overall_risk_level = "low"
-        if display_results:
-            overall_risk_level = display_results[0]["risk_level"]
+        if any(item["risk_level"] == "high" for item in display_results):
+            overall_risk_level = "high"
+        elif any(item["risk_level"] == "medium" for item in display_results):
+            overall_risk_level = "medium"
 
         return {
             "overall_risk_level": overall_risk_level,
-            "suspected_conditions": display_results[:2]
+            "suspected_conditions": display_results
         }
 
     def get_risk_level(self, score: int) -> str:

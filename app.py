@@ -8,7 +8,7 @@ from recommender import build_assessment_result
 from assessment_engine import AssessmentEngine
 from rag_engine import RagEngine
 from db import get_db_connection
-from followup_agent import should_ask_followup, generate_followup_questions, merge_followup_answers
+# followup_agent 已停用：评估接口不再返回 code=210 追问流程
 import re
 from flask import Flask, jsonify, request, render_template, redirect, url_for, session
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -652,8 +652,7 @@ def assessment():
         # 多症状/多关注点：不再只取第一个，而是保留完整列表。
         primary_concern = selected_concerns[0] if selected_concerns else "unknown"
 
-        followup_answers = data.get("followup_answers", {})
-
+        # 追问功能已停用：所有评估请求直接返回最终结果，不再进入 code=210 need_followup。
         user_info = {
             "pet_type": pet_type,
             "primary_concern": primary_concern,
@@ -670,24 +669,7 @@ def assessment():
             }
         }
 
-        if followup_answers:
-            user_info = merge_followup_answers(user_info, followup_answers)
-
         assessment_result = assessment_engine.assess(user_info)
-
-        enable_followup = len(selected_concerns) == 1
-
-        if enable_followup and should_ask_followup(assessment_result, user_info) and not followup_answers:
-            questions = generate_followup_questions(assessment_result, user_info)
-            return jsonify({
-                "code": 210,
-                "message": "need_followup",
-                "data": {
-                    "followup_needed": True,
-                    "questions": questions,
-                    "initial_assessment": assessment_result
-                }
-            })
 
         suspected_conditions = assessment_result.get("suspected_conditions", [])
 

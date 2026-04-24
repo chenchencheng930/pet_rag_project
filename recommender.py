@@ -368,9 +368,16 @@ def build_assessment_result(filtered_items: list, user_info: dict, assessment_re
         best_text = pick_best_product_text(filtered_items)
         product_recommendations = build_product_recommendations(best_text, primary_concern)
 
+    if suspected_conditions:
+        final_suspected_conditions = suspected_conditions
+    else:
+        final_suspected_conditions = []
+        for concern in concerns:
+            final_suspected_conditions.extend(build_suspected_conditions(concern, user_info))
+
     return {
         "summary": summary,
-        "suspected_conditions": suspected_conditions if suspected_conditions else build_suspected_conditions(primary_concern, user_info),
+        "suspected_conditions": final_suspected_conditions,
         "overall_risk_level": overall_risk_level,
         "health_advice": unique_extend(sum([build_health_advice(c) for c in concerns[:3]], [])),
         "diet_advice": unique_extend(sum([build_diet_advice(c) for c in concerns[:3]], [])),
