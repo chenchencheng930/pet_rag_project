@@ -333,6 +333,67 @@
             }
         });
 
+        function openUsernameEditor() {
+            const panel = document.getElementById('usernameEditPanel');
+            const input = document.getElementById('usernameEditInput');
+
+            input.value = currentProfileUser || '';
+            panel.classList.add('active');
+            input.focus();
+        }
+
+        function closeUsernameEditor() {
+            const panel = document.getElementById('usernameEditPanel');
+            panel.classList.remove('active');
+        }
+
+        async function saveUsername() {
+            const input = document.getElementById('usernameEditInput');
+            const newUsername = input.value.trim();
+
+            if (!newUsername) {
+                alert('用户名不能为空');
+                return;
+            }
+
+            if (newUsername.length < 2 || newUsername.length > 20) {
+                alert('用户名长度需为 2-20 个字符');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/account/username', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: newUsername })
+                });
+
+                const result = await response.json();
+
+                if (!response.ok || result.code !== 200) {
+                    alert(result.message || '改名失败');
+                    return;
+                }
+
+                const oldUsername = currentProfileUser;
+                currentProfileUser = result.data.username;
+
+                document.getElementById('userNameDisplay').innerText = currentProfileUser;
+                localStorage.setItem('currentUser', currentProfileUser);
+
+                const oldAvatar = oldUsername ? localStorage.getItem(`avatar_${oldUsername}`) : null;
+                if (oldAvatar) {
+                    localStorage.setItem(`avatar_${currentProfileUser}`, oldAvatar);
+                }
+
+                closeUsernameEditor();
+                alert('用户名已更新');
+            } catch (e) {
+                alert('改名失败，请稍后重试');
+            }
+        }
+
         async function handleAvatarUpload(event) {
             const file = event.target.files[0];
             if (!file || !currentProfileUser) return;
