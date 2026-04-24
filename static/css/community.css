@@ -266,3 +266,26 @@
         flex-wrap: wrap;
     }
 }
+
+
+/* 社区增强：通知、回复、评论图片、删除 */
+.community-header-actions { margin-left: auto; display: flex; align-items: center; gap: 10px; position: relative; }
+.notification-btn { position: relative; border: 1px solid #dbeafe; background: #eff6ff; color: #1d4ed8; width: 36px; height: 36px; border-radius: 999px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+.notification-badge { position: absolute; top: -5px; right: -5px; min-width: 18px; height: 18px; border-radius: 999px; background: #ef4444; color: #fff; font-size: 11px; display: none; align-items: center; justify-content: center; padding: 0 4px; }
+.notification-panel { display: none; position: absolute; top: 42px; right: 0; width: 320px; max-height: 360px; overflow-y: auto; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 16px 40px rgba(15,23,42,0.12); z-index: 30; }
+.notification-panel.active { display: block; }
+.notification-item { padding: 12px 14px; border-bottom: 1px solid #f1f5f9; font-size: 13px; color: #334155; cursor: pointer; }
+.notification-item.unread { background: #eff6ff; font-weight: 600; }
+.notification-time { margin-top: 4px; color: #94a3b8; font-size: 12px; font-weight: 400; }
+.comment-reply-btn, .comment-image-btn { border: none; background: transparent; color: #1a73e8; font-size: 12px; cursor: pointer; padding: 0; margin-right: 10px; }
+.comment-reply-tip { display: none; align-items: center; justify-content: space-between; gap: 8px; background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; border-radius: 8px; padding: 8px 10px; font-size: 13px; margin-bottom: 8px; }
+.comment-image-preview { display: none; margin: 8px 0; }
+.comment-image-preview img { max-width: 180px; max-height: 120px; border-radius: 8px; border: 1px solid #e2e8f0; display: block; }
+.comment-image { max-width: 220px; max-height: 160px; border-radius: 8px; border: 1px solid #e2e8f0; margin-top: 8px; display: block; }
+.delete-post-btn, .trash-icon-btn { border: none; background: #fff1f2; color: #e11d48; width: 32px; height: 32px; border-radius: 999px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+.delete-post-btn:hover, .trash-icon-btn:hover { background: #e11d48; color: #fff; }
+
+@media (max-width: 768px) {
+    .notification-panel { position: fixed; top: 62px; left: 12px; right: 12px; width: auto; }
+    .community-header-actions { width: 100%; justify-content: flex-end; }
+}

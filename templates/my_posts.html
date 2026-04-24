@@ -30,9 +30,16 @@
             .sidebar { display: none; }
             .top-header { padding: 12px; font-size: 12px; height: auto; }
         }
+    
+        .trash-icon-btn { border:none; background:#fff1f2; color:#e11d48; width:34px; height:34px; border-radius:999px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; }
+        .trash-icon-btn:hover { background:#e11d48; color:#fff; }
+
     </style>
+    <link href="{{ url_for('static', filename='css/mobile.css') }}" rel="stylesheet">
 </head>
 <body>
+    <button class="mobile-menu-btn" type="button" onclick="toggleMobileSidebar()" aria-label="打开导航">☰</button>
+    <div class="mobile-mask" onclick="closeMobileSidebar()"></div>
 
     <aside class="sidebar">
         <div class="sidebar-brand">
@@ -69,20 +76,46 @@
 
     <script>
     const DEFAULT_AVATAR = "{{ url_for('static', filename='assets/default_avatar.png') }}";
-    const currentUser = localStorage.getItem('currentUser');
+    let currentUserInfo = null;
 
-    if (!currentUser) {
-        alert("无访问权限，请先登录。");
-        window.location.href = "{{ url_for('login') }}";
+    async function ensureCurrentUser() {
+        try {
+            const res = await fetch('/api/me', { credentials: 'include' });
+            const json = await res.json();
+            if (!res.ok || json.code !== 200) {
+                window.location.href = "{{ url_for('login') }}";
+                return null;
+            }
+            currentUserInfo = json.data;
+            if (currentUserInfo.username) {
+                localStorage.setItem('currentUser', currentUserInfo.username);
+            }
+            return currentUserInfo;
+        } catch (e) {
+            window.location.href = "{{ url_for('login') }}";
+            return null;
+        }
+    }
+
+    function escapeHtml(value) {
+        return String(value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     }
 
     async function loadMyPosts() {
+        const user = await ensureCurrentUser();
+        if (!user) return;
+
         const container = document.getElementById('myPostsContainer');
         const emptyState = document.getElementById('emptyState');
         container.innerHTML = '';
 
         try {
-            const res = await fetch('/api/community/posts');
+            const res = await fetch('/api/community/posts', { credentials: 'include' });
             const json = await res.json();
 
             if (json.code !== 200) {
@@ -90,9 +123,9 @@
                 return;
             }
 
-            const myPosts = (json.data || []).filter(
-                post => (post.author_name || '') === currentUser
-            );
+            const myPosts = (json.data || []).filter(post => {
+                return user.is_admin || Number(post.user_id) === Number(user.id);
+            });
 
             if (myPosts.length === 0) {
                 container.style.display = 'none';
@@ -103,23 +136,24 @@
             emptyState.style.display = 'none';
             container.style.display = 'block';
 
-            const savedAvatar = localStorage.getItem(`avatar_${currentUser}`) || DEFAULT_AVATAR;
-
             myPosts.forEach(post => {
-                const topicHtml = post.topic ? `<span style="color:#1a73e8;font-weight:500;margin-right:8px;">#${post.topic}</span>` : '';
+                const topicHtml = post.topic ? `<span style="color:#1a73e8;font-weight:500;margin-right:8px;">#${escapeHtml(post.topic)}</span>` : '';
                 const imageHtml = post.image_url ? `<img src="${post.image_url}" style="max-width:100%;max-height:300px;border-radius:8px;margin-top:12px;border:1px solid #e2e8f0;display:block;">` : '';
+                const avatar = post.avatar_data || DEFAULT_AVATAR;
+                const ownerLabel = user.is_admin && Number(post.user_id) !== Number(user.id) ? ' · 管理员可删除' : '';
 
                 const postHtml = `
-                    <article style="position:relative;background-color:#ffffff;border-radius:12px;padding:24px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,0.02);border:1px solid #e2e8f0;">
+                    <article id="post-${post.id}" style="position:relative;background-color:#ffffff;border-radius:12px;padding:24px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,0.02);border:1px solid #e2e8f0;">
                         <div style="display:flex;align-items:center;margin-bottom:16px;">
-                            <img src="${savedAvatar}" style="width:44px;height:44px;border-radius:50%;background-color:#e2e8f0;margin-right:12px;object-fit:cover;">
+                            <img src="${avatar}" style="width:44px;height:44px;border-radius:50%;background-color:#e2e8f0;margin-right:12px;object-fit:cover;" onerror="this.src='${DEFAULT_AVATAR}'">
                             <div>
-                                <div style="font-size:15px;font-weight:600;color:#1e293b;">${post.author_name}</div>
+                                <div style="font-size:15px;font-weight:600;color:#1e293b;">${escapeHtml(post.author_name)}${ownerLabel}</div>
                                 <div style="font-size:12px;color:#94a3b8;">发布时间：${post.created_at || ''}</div>
                             </div>
+                            <button class="trash-icon-btn" onclick="deletePost(${post.id})" title="删除帖子" style="margin-left:auto;">🗑</button>
                         </div>
                         <div style="font-size:15px;color:#334155;line-height:1.7;">
-                            ${topicHtml}${post.content || ''}
+                            ${topicHtml}${escapeHtml(post.content || '')}
                             ${imageHtml}
                         </div>
                         <div style="padding-top:16px;border-top:1px solid #f1f5f9;display:flex;gap:24px;color:#64748b;font-size:13px;margin-top:16px;">
@@ -136,14 +170,29 @@
         }
     }
 
+    async function deletePost(postId) {
+        if (!confirm('确定要删除这个帖子吗？')) return;
+
+        try {
+            const res = await fetch(`/api/community/posts/${postId}`, {
+                method: 'DELETE',
+                credentials: 'include'
+            });
+            const json = await res.json();
+            if (json.code !== 200) {
+                alert(json.message || '删除失败');
+                return;
+            }
+            await loadMyPosts();
+        } catch (e) {
+            alert('删除失败，请稍后重试');
+        }
+    }
+
     document.addEventListener('DOMContentLoaded', loadMyPosts);
     </script>
 
-
-
-
-<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
-<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"45c2bf8136a245cd97f1c2e9a96c0730","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script src="{{ url_for('static', filename='js/global_reminder.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/mobile.js') }}"></script>
 </body>
 </html>

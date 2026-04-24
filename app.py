@@ -48,6 +48,7 @@ def ensure_user_phone_column():
             conn.close()
 
 ensure_user_phone_column()
+ensure_community_schema()
 
 assessment_engine = AssessmentEngine()
 rag_engine = RagEngine()
@@ -62,6 +63,155 @@ def format_dt(dt):
         return dt.strftime("%Y-%m-%d %H:%M")
     except Exception:
         return str(dt)
+
+
+def is_text_has_emoji(value):
+    """Reject most emoji/symbol pictographs in post/comment text."""
+    if not value:
+        return False
+    emoji_pattern = re.compile(
+        "["
+        "\U0001F300-\U0001FAFF"
+        "\U00002700-\U000027BF"
+        "\U00002600-\U000026FF"
+        "]+",
+        flags=re.UNICODE
+    )
+    return emoji_pattern.search(value) is not None
+
+
+def get_current_user_record():
+    user_id = session.get("user_id")
+    if not user_id:
+        return None
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "SELECT id, username, phone, avatar_data, is_admin FROM users WHERE id=%s",
+                (user_id,)
+            )
+            return cursor.fetchone()
+    except Exception as e:
+        print("Warning: cannot fetch current user:", e)
+        return None
+    finally:
+        if conn:
+            conn.close()
+
+
+def is_admin_user(user=None):
+    if not user:
+        user = get_current_user_record()
+    if not user:
+        return False
+
+    if int(user.get("is_admin") or 0) == 1:
+        return True
+
+    admin_usernames = [
+        item.strip()
+        for item in (os.getenv("ADMIN_USERNAMES") or "").split(",")
+        if item.strip()
+    ]
+    admin_phones = [
+        item.strip()
+        for item in (os.getenv("ADMIN_PHONES") or "").split(",")
+        if item.strip()
+    ]
+
+    return (user.get("username") in admin_usernames) or (user.get("phone") in admin_phones)
+
+
+def ensure_community_schema():
+    """Small idempotent schema upgrades for profile/community features."""
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
+            # users: avatar + admin flag
+            cursor.execute("SHOW COLUMNS FROM users LIKE 'avatar_data'")
+            if not cursor.fetchone():
+                cursor.execute("ALTER TABLE users ADD COLUMN avatar_data LONGTEXT NULL")
+
+            cursor.execute("SHOW COLUMNS FROM users LIKE 'is_admin'")
+            if not cursor.fetchone():
+                cursor.execute("ALTER TABLE users ADD COLUMN is_admin TINYINT(1) NOT NULL DEFAULT 0")
+
+            # posts: make sure user_id exists
+            cursor.execute("SHOW COLUMNS FROM community_posts LIKE 'user_id'")
+            if not cursor.fetchone():
+                cursor.execute("ALTER TABLE community_posts ADD COLUMN user_id INT NULL")
+
+            # comments: user/reply/image support
+            cursor.execute("SHOW COLUMNS FROM community_comments LIKE 'user_id'")
+            if not cursor.fetchone():
+                cursor.execute("ALTER TABLE community_comments ADD COLUMN user_id INT NULL")
+
+            cursor.execute("SHOW COLUMNS FROM community_comments LIKE 'parent_comment_id'")
+            if not cursor.fetchone():
+                cursor.execute("ALTER TABLE community_comments ADD COLUMN parent_comment_id INT NULL")
+
+            cursor.execute("SHOW COLUMNS FROM community_comments LIKE 'reply_to_user_id'")
+            if not cursor.fetchone():
+                cursor.execute("ALTER TABLE community_comments ADD COLUMN reply_to_user_id INT NULL")
+
+            cursor.execute("SHOW COLUMNS FROM community_comments LIKE 'image_url'")
+            if not cursor.fetchone():
+                cursor.execute("ALTER TABLE community_comments ADD COLUMN image_url LONGTEXT NULL")
+
+            # likes table for one-user-one-like toggle
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS community_post_likes (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    post_id INT NOT NULL,
+                    user_id INT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE KEY uniq_post_user (post_id, user_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            """)
+
+            # notifications table
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS community_notifications (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    user_id INT NOT NULL,
+                    actor_user_id INT NULL,
+                    actor_name VARCHAR(255) NULL,
+                    post_id INT NULL,
+                    comment_id INT NULL,
+                    type VARCHAR(50) NOT NULL,
+                    message VARCHAR(500) NOT NULL,
+                    is_read TINYINT(1) NOT NULL DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            """)
+
+        conn.commit()
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        print("Warning: cannot ensure community schema:", e)
+    finally:
+        if conn:
+            conn.close()
+
+
+def create_notification(cursor, user_id, actor_user_id, actor_name, post_id, comment_id, notify_type, message):
+    if not user_id or (actor_user_id and int(user_id) == int(actor_user_id)):
+        return
+
+    cursor.execute(
+        """
+        INSERT INTO community_notifications
+        (user_id, actor_user_id, actor_name, post_id, comment_id, type, message)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """,
+        (user_id, actor_user_id, actor_name, post_id, comment_id, notify_type, message)
+    )
+
 
 
 @app.route("/db-test", methods=["GET"])
@@ -291,6 +441,8 @@ def extract_coze_answer(payload):
 
 @app.route("/dashboard")
 def dashboard():
+    if not session.get("user_id"):
+        return redirect(url_for("login"))
     return render_template("dashboard.html")
 
 
@@ -303,16 +455,22 @@ def community():
 
 @app.route("/reminder")
 def reminder():
+    if not session.get("user_id"):
+        return redirect(url_for("login"))
     return render_template("reminder.html")
 
 
 @app.route("/profile")
 def profile():
+    if not session.get("user_id"):
+        return redirect(url_for("login"))
     return render_template("profile.html")
 
 
 @app.route("/my_posts")
 def my_posts():
+    if not session.get("user_id"):
+        return redirect(url_for("login"))
     return render_template("my_posts.html")
 
 @app.route("/my-pets")
@@ -426,7 +584,7 @@ def api_me():
         conn = get_db_connection()
         with conn.cursor() as cursor:
             cursor.execute(
-                "SELECT id, username, phone FROM users WHERE id=%s",
+                "SELECT id, username, phone, avatar_data, is_admin FROM users WHERE id=%s",
                 (user_id,)
             )
             user = cursor.fetchone()
@@ -445,11 +603,71 @@ def api_me():
                 "id": user["id"],
                 "username": user["username"],
                 "phone": phone,
-                "masked_phone": masked_phone
+                "masked_phone": masked_phone,
+                "avatar_data": user.get("avatar_data") or "",
+                "is_admin": is_admin_user(user)
             }
         })
     except Exception as e:
         return jsonify({"code": 500, "message": "获取用户信息失败", "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+
+@app.route("/api/account/username", methods=["POST"])
+def api_account_username():
+    user_id = session.get("user_id")
+    if not user_id:
+        return jsonify({"code": 401, "message": "未登录"}), 401
+
+    data = request.get_json(silent=True) or {}
+    new_username = (data.get("username") or "").strip()
+
+    if not new_username:
+        return jsonify({"code": 400, "message": "用户名不能为空"}), 400
+
+    if len(new_username) < 2 or len(new_username) > 20:
+        return jsonify({"code": 400, "message": "用户名长度需为 2-20 个字符"}), 400
+
+    # 只限制明显会破坏显示/数据库的特殊控制字符，不限制 emoji。
+    if re.search(r"[<>\"'\\\\/]", new_username):
+        return jsonify({"code": 400, "message": "用户名不能包含特殊符号 < > \\" ' \\\\ /"}), 400
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "SELECT id FROM users WHERE username=%s AND id<>%s",
+                (new_username, user_id)
+            )
+            if cursor.fetchone():
+                return jsonify({"code": 400, "message": "该用户名已被占用"}), 400
+
+            cursor.execute(
+                "UPDATE users SET username=%s WHERE id=%s",
+                (new_username, user_id)
+            )
+
+            # 同步历史帖子和评论展示名，避免个人主页改名后社区旧内容还是旧名。
+            cursor.execute(
+                "UPDATE community_posts SET author_name=%s WHERE user_id=%s",
+                (new_username, user_id)
+            )
+            cursor.execute(
+                "UPDATE community_comments SET author_name=%s WHERE user_id=%s",
+                (new_username, user_id)
+            )
+
+        conn.commit()
+        session["username"] = new_username
+        return jsonify({"code": 200, "message": "用户名已更新", "data": {"username": new_username}})
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        return jsonify({"code": 500, "message": "用户名更新失败", "error": str(e)}), 500
     finally:
         if conn:
             conn.close()
@@ -523,6 +741,42 @@ def api_account_security():
         if conn:
             conn.rollback()
         return jsonify({"code": 500, "message": "账户安全更新失败", "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+
+@app.route("/api/profile/avatar", methods=["POST"])
+def api_profile_avatar():
+    user_id = session.get("user_id")
+    if not user_id:
+        return jsonify({"code": 401, "message": "未登录"}), 401
+
+    data = request.get_json(silent=True) or {}
+    avatar_data = data.get("avatar_data") or ""
+
+    if not avatar_data:
+        return jsonify({"code": 400, "message": "头像不能为空"}), 400
+
+    # base64 图片很长，简单限制一下，避免误传超大文件。
+    if len(avatar_data) > 2_500_000:
+        return jsonify({"code": 400, "message": "头像图片过大，请选择较小图片"}), 400
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "UPDATE users SET avatar_data=%s WHERE id=%s",
+                (avatar_data, user_id)
+            )
+        conn.commit()
+        return jsonify({"code": 200, "message": "头像已更新", "data": {"avatar_data": avatar_data}})
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        return jsonify({"code": 500, "message": "头像保存失败", "error": str(e)}), 500
     finally:
         if conn:
             conn.close()
@@ -758,53 +1012,91 @@ def assessment():
 def get_community_posts():
     conn = None
     try:
-        print("[GET posts] start")
+        current_user_id = session.get("user_id")
+        current_user = get_current_user_record()
+        current_is_admin = is_admin_user(current_user)
 
         conn = get_db_connection()
         with conn.cursor() as cursor:
             cursor.execute(
                 """
-                SELECT id, author_name, topic, content, image_url, like_count, comment_count, created_at
-                FROM community_posts
-                ORDER BY id DESC
+                SELECT p.id, p.user_id, p.author_name, p.topic, p.content, p.image_url,
+                       p.like_count, p.comment_count, p.created_at,
+                       u.avatar_data
+                FROM community_posts p
+                LEFT JOIN users u ON p.user_id = u.id
+                ORDER BY p.id DESC
                 """
             )
             posts = cursor.fetchall()
 
             cursor.execute(
                 """
-                SELECT id, post_id, author_name, content, created_at
-                FROM community_comments
-                ORDER BY id ASC
+                SELECT c.id, c.post_id, c.user_id, c.parent_comment_id, c.reply_to_user_id,
+                       c.author_name, c.content, c.image_url, c.created_at,
+                       u.avatar_data,
+                       ru.username AS reply_to_username
+                FROM community_comments c
+                LEFT JOIN users u ON c.user_id = u.id
+                LEFT JOIN users ru ON c.reply_to_user_id = ru.id
+                ORDER BY c.id ASC
                 """
             )
             comments = cursor.fetchall()
+
+            liked_ids = set()
+            if current_user_id:
+                cursor.execute(
+                    "SELECT post_id FROM community_post_likes WHERE user_id=%s",
+                    (current_user_id,)
+                )
+                liked_ids = {row["post_id"] for row in cursor.fetchall()}
 
         comments_map = {}
         for item in comments:
             comments_map.setdefault(item["post_id"], []).append({
                 "id": item["id"],
-                "author_name": item["author_name"],
-                "content": item["content"],
-                "created_at": format_dt(item["created_at"])
+                "post_id": item["post_id"],
+                "user_id": item.get("user_id"),
+                "parent_comment_id": item.get("parent_comment_id"),
+                "reply_to_user_id": item.get("reply_to_user_id"),
+                "reply_to_username": item.get("reply_to_username") or "",
+                "author_name": item.get("author_name") or "匿名用户",
+                "avatar_data": item.get("avatar_data") or "",
+                "content": item.get("content") or "",
+                "image_url": item.get("image_url") or "",
+                "created_at": format_dt(item.get("created_at"))
             })
 
         data = []
         for post in posts:
+            is_owner = current_user_id and post.get("user_id") and int(current_user_id) == int(post["user_id"])
             data.append({
                 "id": post["id"],
+                "user_id": post.get("user_id"),
                 "author_name": post.get("author_name") or "匿名用户",
+                "avatar_data": post.get("avatar_data") or "",
                 "topic": post.get("topic") or "",
                 "content": post.get("content") or "",
                 "image_url": post.get("image_url") or "",
                 "like_count": post.get("like_count") or 0,
                 "comment_count": post.get("comment_count") or 0,
                 "created_at": format_dt(post.get("created_at")),
+                "liked_by_me": post["id"] in liked_ids,
+                "can_delete": bool(is_owner or current_is_admin),
                 "comments_list": comments_map.get(post["id"], [])
             })
 
-        print("[GET posts] success")
-        return jsonify({"code": 200, "message": "success", "data": data})
+        return jsonify({
+            "code": 200,
+            "message": "success",
+            "data": data,
+            "current_user": {
+                "id": current_user_id,
+                "username": session.get("username"),
+                "is_admin": current_is_admin
+            }
+        })
 
     except Exception as e:
         print("[GET posts] error =", e)
@@ -817,28 +1109,68 @@ def get_community_posts():
 
 @app.route("/api/community/posts/<int:post_id>/like", methods=["POST"])
 def like_community_post(post_id):
+    user_id = session.get("user_id")
+    actor_name = session.get("username") or "匿名用户"
+
+    if not user_id:
+        return jsonify({"code": 401, "message": "请先登录后再点赞"}), 401
+
     conn = None
     try:
         conn = get_db_connection()
         with conn.cursor() as cursor:
+            cursor.execute("SELECT id, user_id FROM community_posts WHERE id=%s", (post_id,))
+            post = cursor.fetchone()
+            if not post:
+                return jsonify({"code": 404, "message": "帖子不存在"}), 404
+
             cursor.execute(
-                """
-                UPDATE community_posts
-                SET like_count = like_count + 1
-                WHERE id = %s
-                """,
+                "SELECT id FROM community_post_likes WHERE post_id=%s AND user_id=%s",
+                (post_id, user_id)
+            )
+            existed = cursor.fetchone()
+
+            if existed:
+                cursor.execute("DELETE FROM community_post_likes WHERE id=%s", (existed["id"],))
+                liked = False
+            else:
+                cursor.execute(
+                    "INSERT INTO community_post_likes (post_id, user_id) VALUES (%s, %s)",
+                    (post_id, user_id)
+                )
+                liked = True
+                create_notification(
+                    cursor,
+                    post.get("user_id"),
+                    user_id,
+                    actor_name,
+                    post_id,
+                    None,
+                    "like",
+                    f"{actor_name} 赞同了你的帖子"
+                )
+
+            cursor.execute(
+                "SELECT COUNT(*) AS cnt FROM community_post_likes WHERE post_id=%s",
                 (post_id,)
             )
+            like_count = cursor.fetchone()["cnt"]
+
+            cursor.execute(
+                "UPDATE community_posts SET like_count=%s WHERE id=%s",
+                (like_count, post_id)
+            )
+
         conn.commit()
-        return jsonify({"code": 200, "message": "success"})
+        return jsonify({"code": 200, "message": "success", "data": {"liked": liked, "like_count": like_count}})
     except Exception as e:
         if conn:
             conn.rollback()
+        traceback.print_exc()
         return jsonify({"code": 500, "message": "failed to like post", "error": str(e)}), 500
     finally:
         if conn:
             conn.close()
-
 
 
 @app.route("/api/community/posts", methods=["POST"])
@@ -852,16 +1184,13 @@ def create_community_post():
             return jsonify({"code": 401, "message": "请先登录后再发帖"}), 401
 
         data = request.get_json(silent=True) or {}
-        print("[POST posts] data =", data)
-
         topic = (data.get("topic") or "").strip()
         content = (data.get("content") or "").strip()
         image_url = data.get("image_url") or ""
 
         if not content:
             return jsonify({"code": 400, "message": "帖子内容不能为空"}), 400
-
-        conn = get_db_connection()
+conn = get_db_connection()
         with conn.cursor() as cursor:
             cursor.execute(
                 """
@@ -874,8 +1203,6 @@ def create_community_post():
             post_id = cursor.lastrowid
 
         conn.commit()
-        print("[POST posts] success, post_id =", post_id)
-
         return jsonify({"code": 200, "message": "success", "data": {"id": post_id}})
     except Exception as e:
         print("[POST posts] error =", e)
@@ -899,25 +1226,42 @@ def create_community_comment():
             return jsonify({"code": 401, "message": "请先登录后再评论"}), 401
 
         data = request.get_json(silent=True) or {}
-        if not data:
-            return jsonify({"code": 400, "message": "请求体不能为空"}), 400
-
         post_id = data.get("post_id")
+        parent_comment_id = data.get("parent_comment_id")
+        reply_to_user_id = data.get("reply_to_user_id")
         content = (data.get("content") or "").strip()
+        image_url = data.get("image_url") or ""
 
         if not post_id:
             return jsonify({"code": 400, "message": "post_id 不能为空"}), 400
-        if not content:
-            return jsonify({"code": 400, "message": "评论内容不能为空"}), 400
-
-        conn = get_db_connection()
+        if not content and not image_url:
+            return jsonify({"code": 400, "message": "评论内容或图片不能为空"}), 400
+conn = get_db_connection()
         with conn.cursor() as cursor:
+            cursor.execute("SELECT id, user_id, author_name FROM community_posts WHERE id=%s", (post_id,))
+            post = cursor.fetchone()
+            if not post:
+                return jsonify({"code": 404, "message": "帖子不存在"}), 404
+
+            if parent_comment_id:
+                cursor.execute(
+                    "SELECT id, user_id, author_name FROM community_comments WHERE id=%s AND post_id=%s",
+                    (parent_comment_id, post_id)
+                )
+                parent_comment = cursor.fetchone()
+                if not parent_comment:
+                    return jsonify({"code": 404, "message": "要回复的评论不存在"}), 404
+                reply_to_user_id = reply_to_user_id or parent_comment.get("user_id")
+            else:
+                parent_comment = None
+
             cursor.execute(
                 """
-                INSERT INTO community_comments (post_id, author_name, content)
-                VALUES (%s, %s, %s)
+                INSERT INTO community_comments
+                (post_id, user_id, parent_comment_id, reply_to_user_id, author_name, content, image_url)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
                 """,
-                (post_id, author_name, content)
+                (post_id, user_id, parent_comment_id, reply_to_user_id, author_name, content, image_url)
             )
             comment_id = cursor.lastrowid
 
@@ -930,25 +1274,177 @@ def create_community_comment():
                 (post_id,)
             )
 
-        conn.commit()
+            # Notify post owner for new comment.
+            create_notification(
+                cursor,
+                post.get("user_id"),
+                user_id,
+                author_name,
+                post_id,
+                comment_id,
+                "comment",
+                f"{author_name} 评论了你的帖子"
+            )
 
+            # Notify replied comment owner.
+            if reply_to_user_id:
+                create_notification(
+                    cursor,
+                    reply_to_user_id,
+                    user_id,
+                    author_name,
+                    post_id,
+                    comment_id,
+                    "reply",
+                    f"{author_name} 回复了你的评论"
+                )
+
+        conn.commit()
         return jsonify({
             "code": 200,
             "message": "success",
             "data": {
                 "id": comment_id,
                 "post_id": post_id,
+                "user_id": user_id,
+                "parent_comment_id": parent_comment_id,
+                "reply_to_user_id": reply_to_user_id,
+                "reply_to_username": parent_comment.get("author_name") if parent_comment_id and parent_comment else "",
                 "author_name": author_name,
-                "content": content
+                "content": content,
+                "image_url": image_url,
+                "created_at": format_dt(None)
             }
         })
     except Exception as e:
         if conn:
             conn.rollback()
+        traceback.print_exc()
         return jsonify({"code": 500, "message": "failed to create comment", "error": str(e)}), 500
     finally:
         if conn:
             conn.close()
+
+
+@app.route("/api/community/posts/<int:post_id>", methods=["DELETE"])
+def delete_community_post(post_id):
+    user = get_current_user_record()
+    if not user:
+        return jsonify({"code": 401, "message": "请先登录"}), 401
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT id, user_id FROM community_posts WHERE id=%s", (post_id,))
+            post = cursor.fetchone()
+
+            if not post:
+                return jsonify({"code": 404, "message": "帖子不存在"}), 404
+
+            if int(post.get("user_id") or 0) != int(user["id"]) and not is_admin_user(user):
+                return jsonify({"code": 403, "message": "没有权限删除该帖子"}), 403
+
+            cursor.execute("DELETE FROM community_post_likes WHERE post_id=%s", (post_id,))
+            cursor.execute("DELETE FROM community_notifications WHERE post_id=%s", (post_id,))
+            cursor.execute("DELETE FROM community_comments WHERE post_id=%s", (post_id,))
+            cursor.execute("DELETE FROM community_posts WHERE id=%s", (post_id,))
+
+        conn.commit()
+        return jsonify({"code": 200, "message": "删除成功"})
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        traceback.print_exc()
+        return jsonify({"code": 500, "message": "删除帖子失败", "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route("/api/community/notifications", methods=["GET"])
+def get_community_notifications():
+    user_id = session.get("user_id")
+    if not user_id:
+        return jsonify({"code": 401, "message": "未登录"}), 401
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT id, type, message, post_id, comment_id, is_read, created_at
+                FROM community_notifications
+                WHERE user_id=%s
+                ORDER BY id DESC
+                LIMIT 30
+                """,
+                (user_id,)
+            )
+            rows = cursor.fetchall()
+
+            cursor.execute(
+                """
+                SELECT COUNT(*) AS cnt
+                FROM community_notifications
+                WHERE user_id=%s AND is_read=0
+                """,
+                (user_id,)
+            )
+            unread_count = cursor.fetchone()["cnt"]
+
+        return jsonify({
+            "code": 200,
+            "message": "success",
+            "data": {
+                "unread_count": unread_count,
+                "items": [
+                    {
+                        "id": row["id"],
+                        "type": row.get("type"),
+                        "message": row.get("message"),
+                        "post_id": row.get("post_id"),
+                        "comment_id": row.get("comment_id"),
+                        "is_read": row.get("is_read"),
+                        "created_at": format_dt(row.get("created_at"))
+                    }
+                    for row in rows
+                ]
+            }
+        })
+    except Exception as e:
+        return jsonify({"code": 500, "message": "获取通知失败", "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route("/api/community/notifications/read", methods=["POST"])
+def mark_community_notifications_read():
+    user_id = session.get("user_id")
+    if not user_id:
+        return jsonify({"code": 401, "message": "未登录"}), 401
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "UPDATE community_notifications SET is_read=1 WHERE user_id=%s",
+                (user_id,)
+            )
+        conn.commit()
+        return jsonify({"code": 200, "message": "success"})
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        return jsonify({"code": 500, "message": "更新通知失败", "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
 
 
 @app.route("/debug-routes")

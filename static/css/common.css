@@ -67,3 +67,86 @@ body {
     color: #64748b;
     font-size: 14px;
 }
+
+/* 桌面端统一固定侧边栏：不随页面滚动 */
+@media (min-width: 769px) {
+    body {
+        display: block;
+        min-height: 100vh;
+        overflow-x: hidden;
+        overflow-y: auto;
+    }
+
+    .sidebar {
+        position: fixed !important;
+        left: 0 !important;
+        top: 0 !important;
+        width: 220px !important;
+        height: 100vh !important;
+        overflow-y: auto !important;
+        z-index: 1000 !important;
+        flex-shrink: 0 !important;
+        box-shadow: 2px 0 10px rgba(0,0,0,0.05);
+    }
+
+    .sidebar-brand {
+        height: 60px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        border-bottom: 1px solid #2a4365 !important;
+        padding: 0 15px !important;
+        background-color: #152c4d !important;
+        box-sizing: border-box !important;
+    }
+
+    .sidebar-brand img {
+        max-width: 100%;
+        max-height: 35px;
+        object-fit: contain;
+    }
+
+    .nav-menu {
+        padding-top: 15px !important;
+    }
+
+    .sidebar .nav-item,
+    .nav-item {
+        padding: 14px 20px !important;
+        border-left: 3px solid transparent !important;
+        color: #94a3b8 !important;
+        text-decoration: none !important;
+        display: block !important;
+        font-size: 14px !important;
+        line-height: 20px !important;
+        box-sizing: border-box !important;
+        font-weight: 400 !important;
+    }
+
+    .sidebar .nav-item:hover,
+    .nav-item:hover {
+        background-color: #2a4365 !important;
+        color: #ffffff !important;
+    }
+
+    .sidebar .nav-item.active,
+    .nav-item.active {
+        background-color: #2a4365 !important;
+        color: #ffffff !important;
+        border-left-color: #3b82f6 !important;
+        font-weight: 500 !important;
+    }
+
+    .main-content {
+        margin-left: 220px !important;
+        width: calc(100% - 220px) !important;
+        min-height: 100vh !important;
+        overflow: visible !important;
+        box-sizing: border-box !important;
+    }
+
+    #chat-wrapper {
+        left: 220px !important;
+        width: calc(100vw - 220px) !important;
+    }
+}

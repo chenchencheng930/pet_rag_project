@@ -42,6 +42,27 @@
             .comment-input-row { flex-direction: column; }
             .comment-submit-btn { width: 100%; }
         }
+    
+        .community-header-actions { margin-left: auto; display: flex; align-items: center; gap: 10px; position: relative; }
+        .notification-btn { position: relative; border: 1px solid #dbeafe; background: #eff6ff; color: #1d4ed8; width: 36px; height: 36px; border-radius: 999px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+        .notification-badge { position: absolute; top: -5px; right: -5px; min-width: 18px; height: 18px; border-radius: 999px; background: #ef4444; color: #fff; font-size: 11px; display: none; align-items: center; justify-content: center; padding: 0 4px; }
+        .notification-panel { display: none; position: absolute; top: 42px; right: 0; width: 320px; max-height: 360px; overflow-y: auto; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 16px 40px rgba(15,23,42,0.12); z-index: 30; }
+        .notification-panel.active { display: block; }
+        .notification-item { padding: 12px 14px; border-bottom: 1px solid #f1f5f9; font-size: 13px; color: #334155; }
+        .notification-item.unread { background: #eff6ff; font-weight: 600; }
+        .notification-time { margin-top: 4px; color: #94a3b8; font-size: 12px; font-weight: 400; }
+        .comment-reply-btn, .comment-image-btn { border: none; background: transparent; color: #1a73e8; font-size: 12px; cursor: pointer; padding: 0; margin-right: 10px; }
+        .comment-reply-tip { display: none; align-items: center; justify-content: space-between; gap: 8px; background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; border-radius: 8px; padding: 8px 10px; font-size: 13px; margin-bottom: 8px; }
+        .comment-image-preview { display: none; margin: 8px 0; }
+        .comment-image-preview img { max-width: 180px; max-height: 120px; border-radius: 8px; border: 1px solid #e2e8f0; display: block; }
+        .comment-image { max-width: 220px; max-height: 160px; border-radius: 8px; border: 1px solid #e2e8f0; margin-top: 8px; display: block; }
+        .delete-post-btn { margin-left: auto; border: none; background: #fff1f2; color: #e11d48; width: 32px; height: 32px; border-radius: 999px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+        .delete-post-btn:hover { background: #e11d48; color: #fff; }
+        @media (max-width: 768px) {
+            .notification-panel { position: fixed; top: 62px; left: 12px; right: 12px; width: auto; }
+            .community-header-actions { width: 100%; justify-content: flex-end; }
+        }
+
     </style>
     <link href="{{ url_for('static', filename='css/mobile.css') }}" rel="stylesheet">
 </head>
@@ -66,7 +87,15 @@
     <main class="main-content">
         <header class="top-header">
             <span>工作台 / 宠主交流社区</span>
-            <span style="color:#64748b;font-weight:500;">知识图谱与互助网络</span>
+            <div class="community-header-actions">
+                <span style="color:#64748b;font-weight:500;">知识图谱与互助网络</span>
+                <button class="notification-btn" type="button" onclick="toggleNotificationPanel()" title="消息提醒">🔔
+                    <span class="notification-badge" id="notificationBadge"></span>
+                </button>
+                <div class="notification-panel" id="notificationPanel">
+                    <div class="notification-item">暂无消息</div>
+                </div>
+            </div>
         </header>
 
         <section class="community-wrapper" style="max-width:800px;margin:0 auto;width:100%;padding:20px;">
@@ -114,18 +143,80 @@
         const DEFAULT_AVATAR = "{{ url_for('static', filename='assets/default_avatar.png') }}";
         let currentSelectedImageBase64 = '';
         let currentPreviewObjectUrl = '';
+        let currentCommentImages = {};
+        let activeReplies = {};
+        let notificationPanelOpen = false;
 
         const CommunityDataStore = {
             feeds: [],
+            currentUser: null,
             getCurrentUser() {
-                return localStorage.getItem('currentUser') || '匿名访客';
+                return this.currentUser?.username || localStorage.getItem('currentUser') || '匿名访客';
             }
         };
 
         document.addEventListener('DOMContentLoaded', async () => {
             await loadPostsFromServer();
-});
+            await loadNotifications();
+            setInterval(loadNotifications, 30000);
+        });
 
+        function hasEmoji(value) { return false; }
+
+        async function loadNotifications() {
+            try {
+                const res = await fetch('/api/community/notifications', { credentials: 'include' });
+                const json = await res.json();
+                if (json.code !== 200) return;
+
+                const badge = document.getElementById('notificationBadge');
+                const panel = document.getElementById('notificationPanel');
+                const count = json.data.unread_count || 0;
+
+                if (count > 0) {
+                    badge.style.display = 'inline-flex';
+                    badge.textContent = count > 99 ? '99+' : count;
+                } else {
+                    badge.style.display = 'none';
+                    badge.textContent = '';
+                }
+
+                const items = json.data.items || [];
+                panel.innerHTML = items.length
+                    ? items.map(item => `
+                        <div class="notification-item ${item.is_read ? '' : 'unread'}" onclick="scrollToPost(${item.post_id || 0})">
+                            ${escapeHtml(item.message)}
+                            <div class="notification-time">${item.created_at || ''}</div>
+                        </div>
+                    `).join('')
+                    : '<div class="notification-item">暂无消息</div>';
+            } catch (e) {}
+        }
+
+        async function toggleNotificationPanel() {
+            const panel = document.getElementById('notificationPanel');
+            notificationPanelOpen = !notificationPanelOpen;
+            panel.classList.toggle('active', notificationPanelOpen);
+
+            if (notificationPanelOpen) {
+                try {
+                    await fetch('/api/community/notifications/read', {
+                        method: 'POST',
+                        credentials: 'include'
+                    });
+                    await loadNotifications();
+                    panel.classList.add('active');
+                } catch (e) {}
+            }
+        }
+
+        function scrollToPost(postId) {
+            if (!postId) return;
+            const el = document.getElementById(`post-${postId}`);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
 
         async function loadPostsFromServer() {
             try {
@@ -133,19 +224,26 @@
                 const json = await res.json();
 
                 if (json.code === 200) {
+                    CommunityDataStore.currentUser = json.current_user || null;
+                    if (CommunityDataStore.currentUser?.username) {
+                        localStorage.setItem('currentUser', CommunityDataStore.currentUser.username);
+                    }
+
                     CommunityDataStore.feeds = (json.data || []).map(post => ({
                         id: post.id,
+                        userId: post.user_id,
                         authorName: post.author_name || '社区用户',
-                        avatarUrl: localStorage.getItem(`avatar_${post.author_name}`) || DEFAULT_AVATAR,
+                        avatarUrl: post.avatar_data || DEFAULT_AVATAR,
                         publishTime: post.created_at || '刚刚',
-                        petInfo: '系统认证用户',
+                        petInfo: post.can_delete ? '我的发布' : '系统认证用户',
                         topic: post.topic || '',
                         content: post.content || '',
                         imageUrl: post.image_url || '',
                         likes: post.like_count || 0,
                         comments: post.comment_count || 0,
                         comments_list: post.comments_list || [],
-                        isLiked: false,
+                        isLiked: !!post.liked_by_me,
+                        canDelete: !!post.can_delete,
                         commentsExpanded: false
                     }));
                 } else {
@@ -176,24 +274,41 @@
             CommunityDataStore.feeds.forEach(post => {
                 const likeClass = post.isLiked ? 'feed-action-btn active' : 'feed-action-btn';
                 const commentClass = post.commentsExpanded ? 'feed-action-btn active' : 'feed-action-btn';
-                const topicHtml = post.topic ? `<span class="topic-tag" style="color:#1a73e8;font-weight:500;margin-right:8px;">#${post.topic}</span>` : '';
+                const topicHtml = post.topic ? `<span class="topic-tag" style="color:#1a73e8;font-weight:500;margin-right:8px;">#${escapeHtml(post.topic)}</span>` : '';
                 const imageHtml = post.imageUrl ? `<img src="${post.imageUrl}" class="feed-image" alt="附件影像" style="max-width:100%;max-height:300px;border-radius:8px;margin-top:12px;border:1px solid #e2e8f0;display:block;">` : '';
+                const deleteBtn = post.canDelete ? `<button class="delete-post-btn" onclick="deletePost(${post.id})" title="删除帖子">🗑</button>` : '';
 
                 const commentsHtml = post.comments_list && post.comments_list.length > 0
-                    ? post.comments_list.map(comment => `
-                        <div class="comment-item">
-                            <div class="comment-author">${comment.author_name}</div>
-                            <div class="comment-text">${escapeHtml(comment.content)}</div>
-                            <div class="comment-time">${comment.created_at || ''}</div>
-                        </div>
-                    `).join('')
+                    ? post.comments_list.map(comment => {
+                        const replyPrefix = comment.reply_to_username ? `<span style="color:#1a73e8;">回复 @${escapeHtml(comment.reply_to_username)}：</span>` : '';
+                        const commentImage = comment.image_url ? `<img class="comment-image" src="${comment.image_url}" alt="评论图片">` : '';
+                        return `
+                            <div class="comment-item" id="comment-${comment.id}">
+                                <div class="comment-author">${escapeHtml(comment.author_name)}</div>
+                                <div class="comment-text">${replyPrefix}${escapeHtml(comment.content)}</div>
+                                ${commentImage}
+                                <div class="comment-time">${comment.created_at || ''}</div>
+                                <button class="comment-reply-btn" onclick="setReplyTarget(${post.id}, ${comment.id}, ${comment.user_id || 'null'}, '${escapeAttr(comment.author_name)}')">回复</button>
+                            </div>
+                        `;
+                    }).join('')
                     : `<div class="comment-empty">还没有评论，来抢沙发吧。</div>`;
 
                 const panelHtml = post.commentsExpanded ? `
                     <div class="comment-panel">
                         <div class="comment-list">${commentsHtml}</div>
+                        <div class="comment-reply-tip" id="reply-tip-${post.id}">
+                            <span id="reply-tip-text-${post.id}"></span>
+                            <button type="button" class="comment-reply-btn" onclick="clearReplyTarget(${post.id})">取消回复</button>
+                        </div>
+                        <div class="comment-image-preview" id="comment-image-preview-${post.id}">
+                            <img id="comment-image-img-${post.id}" src="" alt="评论图片预览">
+                            <button type="button" class="comment-reply-btn" onclick="removeCommentImage(${post.id})">删除图片</button>
+                        </div>
                         <div class="comment-input-row">
                             <textarea id="comment-input-${post.id}" class="comment-input" placeholder="写下你的评论..."></textarea>
+                            <input type="file" id="comment-file-${post.id}" accept="image/*" style="display:none" onchange="handleCommentImageSelection(event, ${post.id})">
+                            <button class="comment-submit-btn" type="button" onclick="document.getElementById('comment-file-${post.id}').click()">图片</button>
                             <button class="comment-submit-btn" onclick="submitComment(${post.id})">发送评论</button>
                         </div>
                     </div>
@@ -204,12 +319,13 @@
                         <div class="feed-header" style="display:flex;align-items:center;margin-bottom:16px;">
                             <img src="${post.avatarUrl || DEFAULT_AVATAR}" alt="用户头像" class="author-avatar" style="width:44px;height:44px;border-radius:50%;background-color:#e2e8f0;margin-right:12px;object-fit:cover;" onerror="this.src='${DEFAULT_AVATAR}'">
                             <div class="author-info" style="display:flex;flex-direction:column;">
-                                <span class="author-name" style="font-size:15px;font-weight:600;color:#1e293b;margin-bottom:2px;">${post.authorName}</span>
+                                <span class="author-name" style="font-size:15px;font-weight:600;color:#1e293b;margin-bottom:2px;">${escapeHtml(post.authorName)}</span>
                                 <div class="author-meta" style="font-size:12px;color:#94a3b8;display:flex;gap:10px;">
                                     <span>${post.publishTime}</span>
                                     <span class="pet-tag" style="background-color:#f1f5f9;color:#475569;padding:2px 6px;border-radius:4px;font-size:11px;">${post.petInfo}</span>
                                 </div>
                             </div>
+                            ${deleteBtn}
                         </div>
 
                         <div class="feed-content" style="font-size:15px;color:#334155;line-height:1.7;margin-bottom:16px;word-break:break-word;">
@@ -222,7 +338,7 @@
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path>
                                 </svg>
-                                <span>赞同 ${post.likes}</span>
+                                <span>${post.isLiked ? '已赞同' : '赞同'} ${post.likes}</span>
                             </div>
                             <div class="${commentClass}" onclick="toggleComments(${post.id})" style="display:flex;align-items:center;gap:6px;color:#64748b;font-size:13px;cursor:pointer;">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -237,6 +353,8 @@
                 `;
                 container.insertAdjacentHTML('beforeend', postHtml);
             });
+
+            Object.keys(activeReplies).forEach(postId => updateReplyTip(Number(postId)));
         }
 
         function escapeHtml(value) {
@@ -248,11 +366,42 @@
                 .replace(/'/g, '&#39;');
         }
 
+        function escapeAttr(value) {
+            return String(value || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        }
+
         function toggleComments(postId) {
             const post = CommunityDataStore.feeds.find(p => p.id === postId);
             if (!post) return;
             post.commentsExpanded = !post.commentsExpanded;
             renderFeedList();
+        }
+
+        function setReplyTarget(postId, commentId, userId, authorName) {
+            activeReplies[postId] = { commentId, userId, authorName };
+            updateReplyTip(postId);
+            const textarea = document.getElementById(`comment-input-${postId}`);
+            if (textarea) textarea.focus();
+        }
+
+        function updateReplyTip(postId) {
+            const reply = activeReplies[postId];
+            const tip = document.getElementById(`reply-tip-${postId}`);
+            const tipText = document.getElementById(`reply-tip-text-${postId}`);
+            if (!tip || !tipText) return;
+
+            if (reply) {
+                tip.style.display = 'flex';
+                tipText.textContent = `正在回复 @${reply.authorName}`;
+            } else {
+                tip.style.display = 'none';
+                tipText.textContent = '';
+            }
+        }
+
+        function clearReplyTarget(postId) {
+            delete activeReplies[postId];
+            updateReplyTip(postId);
         }
 
         function handleImageSelection(event) {
@@ -284,6 +433,34 @@
             }
         }
 
+        function handleCommentImageSelection(event, postId) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                currentCommentImages[postId] = e.target.result;
+                const preview = document.getElementById(`comment-image-preview-${postId}`);
+                const img = document.getElementById(`comment-image-img-${postId}`);
+                if (preview && img) {
+                    img.src = currentCommentImages[postId];
+                    preview.style.display = 'block';
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function removeCommentImage(postId) {
+            delete currentCommentImages[postId];
+            const input = document.getElementById(`comment-file-${postId}`);
+            if (input) input.value = '';
+            const preview = document.getElementById(`comment-image-preview-${postId}`);
+            const img = document.getElementById(`comment-image-img-${postId}`);
+            if (preview && img) {
+                img.src = '';
+                preview.style.display = 'none';
+            }
+        }
+
         async function submitPost() {
             const inputEl = document.getElementById('postInput');
             const topicEl = document.getElementById('topicInput');
@@ -294,8 +471,7 @@
                 alert('发布内容不可为空');
                 return;
             }
-
-            try {
+try {
                 const res = await fetch('/api/community/posts', {
                     method: 'POST',
                     credentials: 'include',
@@ -327,19 +503,24 @@
             if (!textarea) return;
 
             const content = textarea.value.trim();
-            if (!content) {
-                alert('评论内容不能为空');
+            const imageUrl = currentCommentImages[postId] || '';
+            const reply = activeReplies[postId];
+
+            if (!content && !imageUrl) {
+                alert('评论内容或图片不能为空');
                 return;
             }
-
-            try {
+try {
                 const res = await fetch('/api/community/comments', {
                     method: 'POST',
                     credentials: 'include',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         post_id: postId,
-                        content: content
+                        content: content,
+                        image_url: imageUrl,
+                        parent_comment_id: reply?.commentId || null,
+                        reply_to_user_id: reply?.userId || null
                     })
                 });
 
@@ -349,22 +530,18 @@
                     return;
                 }
 
-                const post = CommunityDataStore.feeds.find(p => p.id === postId);
-                if (post) {
-                    if (!Array.isArray(post.comments_list)) {
-                        post.comments_list = [];
-                    }
-                    post.comments_list.push(json.data);
-                    post.comments = (post.comments || 0) + 1;
-                    post.commentsExpanded = true;
-                }
+                textarea.value = '';
+                removeCommentImage(postId);
+                clearReplyTarget(postId);
+                await loadPostsFromServer();
 
+                const post = CommunityDataStore.feeds.find(p => p.id === postId);
+                if (post) post.commentsExpanded = true;
                 renderFeedList();
             } catch (e) {
                 alert('评论失败，请检查后端接口是否启动');
             }
         }
-
 
         async function toggleLike(postId) {
             try {
@@ -374,15 +551,41 @@
                 });
                 const json = await res.json();
                 if (json.code === 200) {
-                    await loadPostsFromServer();
+                    const post = CommunityDataStore.feeds.find(p => p.id === postId);
+                    if (post) {
+                        post.isLiked = !!json.data.liked;
+                        post.likes = json.data.like_count;
+                        renderFeedList();
+                    } else {
+                        await loadPostsFromServer();
+                    }
+                    await loadNotifications();
                 } else {
-                    alert('点赞失败');
+                    alert(json.message || '点赞失败');
                 }
             } catch (e) {
                 alert('点赞失败');
             }
         }
 
+        async function deletePost(postId) {
+            if (!confirm('确定要删除这个帖子吗？')) return;
+
+            try {
+                const res = await fetch(`/api/community/posts/${postId}`, {
+                    method: 'DELETE',
+                    credentials: 'include'
+                });
+                const json = await res.json();
+                if (json.code !== 200) {
+                    alert(json.message || '删除失败');
+                    return;
+                }
+                await loadPostsFromServer();
+            } catch (e) {
+                alert('删除失败，请稍后重试');
+            }
+        }
 
     </script>
 <script src="{{ url_for('static', filename='js/global_reminder.js') }}"></script>

@@ -82,6 +82,16 @@
             .user-card { padding: 20px; align-items: flex-start; }
             .stats-grid { grid-template-columns: 1fr; }
         }
+    
+        .username-edit-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .btn-edit-username { border: 1px solid #bfdbfe; background: #eff6ff; color: #1d4ed8; border-radius: 999px; padding: 4px 10px; font-size: 12px; cursor: pointer; }
+        .btn-edit-username:hover { background: #dbeafe; }
+        .username-edit-panel { display: none; margin-top: 10px; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .username-edit-panel.active { display: flex; }
+        .username-edit-input { border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px 10px; font-size: 14px; outline: none; min-width: 180px; }
+        .username-save-btn { border: none; background: #1a73e8; color: #fff; border-radius: 8px; padding: 8px 12px; font-size: 13px; cursor: pointer; }
+        .username-cancel-btn { border: 1px solid #cbd5e1; background: #fff; color: #475569; border-radius: 8px; padding: 8px 12px; font-size: 13px; cursor: pointer; }
+
     </style>
     <link href="{{ url_for('static', filename='css/mobile.css') }}" rel="stylesheet">
 </head>
@@ -119,7 +129,15 @@
                     <div class="avatar-overlay">更换</div>
                 </div>
                 <div class="user-details">
-                    <div class="user-name" id="userNameDisplay">未登录访客</div>
+                    <div class="username-edit-row">
+                        <div class="user-name" id="userNameDisplay">未登录访客</div>
+                        <button class="btn-edit-username" id="editUsernameBtn" type="button" onclick="openUsernameEditor()" style="display:none;">改名</button>
+                    </div>
+                    <div class="username-edit-panel" id="usernameEditPanel">
+                        <input type="text" id="usernameEditInput" class="username-edit-input" maxlength="20" placeholder="输入新用户名">
+                        <button type="button" class="username-save-btn" onclick="saveUsername()">保存</button>
+                        <button type="button" class="username-cancel-btn" onclick="closeUsernameEditor()">取消</button>
+                    </div>
                     <div class="user-status" id="userStatusDisplay">点击登录，获取完整临床决策支持功能</div>
                 </div>
             </div>
@@ -303,15 +321,11 @@
                 localStorage.setItem('currentUser', user.username);
 
                 userNameDisplay.innerText = user.username;
-                userStatusDisplay.innerText = '系统认证用户 · 已绑定手机号：' + user.masked_phone;
+                userStatusDisplay.innerText = (user.is_admin ? '管理员 · ' : '系统认证用户 · ') + '已绑定手机号：' + user.masked_phone;
                 document.getElementById('securityPhone').value = user.masked_phone;
-                document.getElementById('userAvatar').src = DEFAULT_AVATAR;
+                document.getElementById('userAvatar').src = user.avatar_data || DEFAULT_AVATAR;
                 document.getElementById('logoutSection').style.display = 'block';
-
-                const savedAvatar = localStorage.getItem(`avatar_${currentProfileUser}`);
-                if (savedAvatar) {
-                    document.getElementById('userAvatar').src = savedAvatar;
-                }
+                document.getElementById('editUsernameBtn').style.display = 'inline-flex';
             } catch (e) {
                 document.getElementById('userNameDisplay').innerText = '未登录访客';
                 document.getElementById('userStatusDisplay').innerHTML = '<a href="{{ url_for("login") }}" style="color:#1a73e8;text-decoration:none;">点击登录</a>，获取完整临床决策支持功能';
@@ -319,17 +333,37 @@
             }
         });
 
-        function handleAvatarUpload(event) {
+        async function handleAvatarUpload(event) {
             const file = event.target.files[0];
-            if (file && currentProfileUser) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    const base64Image = e.target.result;
+            if (!file || !currentProfileUser) return;
+
+            if (file.size > 2 * 1024 * 1024) {
+                alert('头像图片过大，请选择 2MB 以内的图片');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                const base64Image = e.target.result;
+                try {
+                    const response = await fetch('/api/profile/avatar', {
+                        method: 'POST',
+                        credentials: 'include',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ avatar_data: base64Image })
+                    });
+                    const result = await response.json();
+                    if (!response.ok || result.code !== 200) {
+                        alert(result.message || '头像保存失败');
+                        return;
+                    }
                     document.getElementById('userAvatar').src = base64Image;
                     localStorage.setItem(`avatar_${currentProfileUser}`, base64Image);
-                };
-                reader.readAsDataURL(file);
-            }
+                } catch (err) {
+                    alert('头像上传失败，请稍后重试');
+                }
+            };
+            reader.readAsDataURL(file);
         }
 
         function openModal(id) {

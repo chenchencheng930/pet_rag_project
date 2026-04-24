@@ -37,8 +37,8 @@
         </div>
         <nav class="nav-menu">
             <a href="{{ url_for('home') }}" class="nav-item">平台首页</a>
-            <a href="{{ url_for('chat') }}" class="nav-item active">智能问诊台</a>
-            <a href="{{ url_for('dashboard') }}" class="nav-item">身体信息评估</a>
+            <a href="{{ url_for('chat') }}" class="nav-item">智能问诊台</a>
+            <a href="{{ url_for('dashboard') }}" class="nav-item active">身体信息评估</a>
             <a href="{{ url_for('community') }}" class="nav-item">宠主社区</a>
             <a href="{{ url_for('reminder') }}" class="nav-item">健康提醒</a>
             <a href="{{ url_for('profile') }}" class="nav-item">个人中心</a>
@@ -173,12 +173,7 @@
     <script src="{{ url_for('static', filename='js/global_reminder.js') }}"></script>
     <script src="{{ url_for('static', filename='js/pet_profile_sync.js') }}"></script>
     <script>
-    document.addEventListener('DOMContentLoaded', async () => {
-      await loadPostsFromServer();
-});
-
-
-    function syncDashboardBasicInfo() {
+function syncDashboardBasicInfo() {
         const currentUser = localStorage.getItem('currentUser');
         if (!currentUser || !window.PetProfileSync) return;
 
