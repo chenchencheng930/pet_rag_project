@@ -156,14 +156,11 @@ async function handleClinicalSubmit() {
         } else {
             clearInterval(logInterval);
         }
-    }, 700);
+    }, 200);
 
     try {
         // 调用 api.js 中的模块，并且加入最少 4.5 秒的强制动画等待
-        const [response] = await Promise.all([
-            ApiService.fetchAssessment(payload).catch(() => null),
-            new Promise(resolve => setTimeout(resolve, 4500))
-        ]);
+        const response = await ApiService.fetchAssessment(payload).catch(() => null);
 
         let resultData = null;
 
