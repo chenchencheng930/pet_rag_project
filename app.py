@@ -175,7 +175,7 @@ def api_chat():
         final_chat_json = None
         terminal_status = None
 
-        for _ in range(30):
+        for _ in range(90):
             retrieve_resp = requests.get(
                 "https://api.coze.cn/v3/chat/retrieve",
                 headers=headers,
@@ -296,6 +296,8 @@ def dashboard():
 
 @app.route("/community")
 def community():
+    if not session.get("user_id"):
+        return redirect(url_for("login"))
     return render_template("community.html")
 
 
@@ -634,7 +636,7 @@ def health():
 def assessment():
     conn = None
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         if not data:
             return jsonify({"code": 400, "message": "请求体不能为空"}), 400
 
@@ -843,13 +845,15 @@ def like_community_post(post_id):
 def create_community_post():
     conn = None
     try:
-        data = request.get_json(silent=True)
+        user_id = session.get("user_id")
+        author_name = (session.get("username") or "匿名用户").strip()
+
+        if not user_id:
+            return jsonify({"code": 401, "message": "请先登录后再发帖"}), 401
+
+        data = request.get_json(silent=True) or {}
         print("[POST posts] data =", data)
 
-        if not data:
-            return jsonify({"code": 400, "message": "请求体不能为空"}), 400
-
-        author_name = (data.get("author_name") or "匿名用户").strip()
         topic = (data.get("topic") or "").strip()
         content = (data.get("content") or "").strip()
         image_url = data.get("image_url") or ""
@@ -861,10 +865,11 @@ def create_community_post():
         with conn.cursor() as cursor:
             cursor.execute(
                 """
-                INSERT INTO community_posts (author_name, topic, content, image_url, like_count, comment_count)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                INSERT INTO community_posts
+                (user_id, author_name, topic, content, image_url, like_count, comment_count)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
                 """,
-                (author_name, topic, content, image_url, 0, 0)
+                (user_id, author_name, topic, content, image_url, 0, 0)
             )
             post_id = cursor.lastrowid
 
@@ -883,17 +888,21 @@ def create_community_post():
             conn.close()
 
 
-
 @app.route("/api/community/comments", methods=["POST"])
 def create_community_comment():
     conn = None
     try:
-        data = request.get_json(silent=True)
+        user_id = session.get("user_id")
+        author_name = (session.get("username") or "匿名用户").strip()
+
+        if not user_id:
+            return jsonify({"code": 401, "message": "请先登录后再评论"}), 401
+
+        data = request.get_json(silent=True) or {}
         if not data:
             return jsonify({"code": 400, "message": "请求体不能为空"}), 400
 
         post_id = data.get("post_id")
-        author_name = (data.get("author_name") or "匿名用户").strip()
         content = (data.get("content") or "").strip()
 
         if not post_id:
