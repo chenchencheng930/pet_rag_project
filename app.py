@@ -2,6 +2,7 @@ from flask import Flask, jsonify, request, render_template
 import traceback
 import os
 import requests
+import time
 from rule_filter import apply_rules
 from recommender import build_assessment_result
 from assessment_engine import AssessmentEngine
@@ -100,7 +101,6 @@ def chat():
 @app.route("/api/chat", methods=["POST"])
 def api_chat():
     user_id = session.get("user_id")
-    username = session.get("username")
 
     if not user_id:
         return jsonify({"code": 401, "message": "未登录"}), 401
@@ -119,68 +119,174 @@ def api_chat():
         "Content-Type": "application/json"
     }
 
-    payload = {
-        "bot_id": COZE_BOT_ID,
-        "user_id": str(user_id),
-        "additional_messages": [
-            {
-                "role": "user",
-                "content": query,
-                "content_type": "text"
-            }
-        ]
-    }
-
     try:
-        resp = requests.post(
+        create_payload = {
+            "bot_id": COZE_BOT_ID,
+            "user_id": str(user_id),
+            "stream": False,
+            "auto_save_history": True,
+            "additional_messages": [
+                {
+                    "role": "user",
+                    "content": query,
+                    "content_type": "text"
+                }
+            ]
+        }
+
+        create_resp = requests.post(
             "https://api.coze.cn/v3/chat",
             headers=headers,
-            json=payload,
+            json=create_payload,
             timeout=60
         )
 
         try:
-            result = resp.json()
+            create_json = create_resp.json()
         except Exception:
             return jsonify({
                 "code": 500,
-                "message": "Coze 返回的不是合法 JSON",
-                "raw": resp.text
+                "message": "Coze 创建会话返回的不是合法 JSON",
+                "raw": create_resp.text
             }), 500
 
-        if resp.status_code != 200:
+        if create_resp.status_code != 200:
             return jsonify({
-                "code": resp.status_code,
-                "message": "Coze 请求失败",
-                "data": result
-            }), resp.status_code
+                "code": create_resp.status_code,
+                "message": "Coze 创建会话失败",
+                "data": create_json
+            }), create_resp.status_code
 
-        answer = ""
-        data_block = result.get("data") or {}
+        create_data = create_json.get("data") or {}
+        conversation_id = create_data.get("conversation_id")
+        chat_id = create_data.get("id") or create_data.get("chat_id")
 
-        if isinstance(data_block, dict):
-            messages = data_block.get("messages") or []
-            for item in messages:
-                if item.get("type") == "answer" and item.get("content"):
-                    answer = item.get("content")
-                    break
+        answer = extract_coze_answer(create_json)
+        if answer:
+            return jsonify({"code": 200, "message": "success", "data": {"answer": answer, "raw": create_json}})
 
-            if not answer and data_block.get("answer"):
-                answer = data_block.get("answer")
+        if not conversation_id or not chat_id:
+            return jsonify({
+                "code": 500,
+                "message": "Coze 未返回 conversation_id 或 chat_id",
+                "data": create_json
+            }), 500
 
+        final_chat_json = None
+        terminal_status = None
+
+        for _ in range(30):
+            retrieve_resp = requests.get(
+                "https://api.coze.cn/v3/chat/retrieve",
+                headers=headers,
+                params={"conversation_id": conversation_id, "chat_id": chat_id},
+                timeout=30
+            )
+
+            try:
+                retrieve_json = retrieve_resp.json()
+            except Exception:
+                return jsonify({
+                    "code": 500,
+                    "message": "Coze 查询会话状态返回的不是合法 JSON",
+                    "raw": retrieve_resp.text
+                }), 500
+
+            if retrieve_resp.status_code != 200:
+                return jsonify({
+                    "code": retrieve_resp.status_code,
+                    "message": "Coze 查询会话状态失败",
+                    "data": retrieve_json
+                }), retrieve_resp.status_code
+
+            final_chat_json = retrieve_json
+            status = (retrieve_json.get("data") or {}).get("status")
+            terminal_status = status
+
+            if status == "completed":
+                break
+
+            if status in ("failed", "requires_action", "canceled", "cancelled"):
+                return jsonify({
+                    "code": 500,
+                    "message": f"Coze 会话未完成，状态：{status}",
+                    "data": retrieve_json
+                }), 500
+
+            time.sleep(1)
+
+        if terminal_status != "completed":
+            return jsonify({
+                "code": 504,
+                "message": "Coze 回复超时，请稍后重试",
+                "data": final_chat_json
+            }), 504
+
+        msg_resp = requests.get(
+            "https://api.coze.cn/v3/chat/message/list",
+            headers=headers,
+            params={"conversation_id": conversation_id, "chat_id": chat_id},
+            timeout=30
+        )
+
+        try:
+            msg_json = msg_resp.json()
+        except Exception:
+            return jsonify({
+                "code": 500,
+                "message": "Coze 消息列表返回的不是合法 JSON",
+                "raw": msg_resp.text
+            }), 500
+
+        if msg_resp.status_code != 200:
+            return jsonify({
+                "code": msg_resp.status_code,
+                "message": "Coze 获取消息列表失败",
+                "data": msg_json
+            }), msg_resp.status_code
+
+        answer = extract_coze_answer(msg_json)
         if not answer:
-            answer = result.get("msg") or "未获取到模型回复"
+            return jsonify({"code": 500, "message": "未获取到模型回复", "data": msg_json}), 500
 
-        return jsonify({
-            "code": 200,
-            "message": "success",
-            "data": {
-                "answer": answer,
-                "raw": result
-            }
-        })
+        return jsonify({"code": 200, "message": "success", "data": {"answer": answer, "raw": msg_json}})
+
     except requests.RequestException as e:
         return jsonify({"code": 500, "message": "调用 Coze 失败", "error": str(e)}), 500
+
+
+def extract_coze_answer(payload):
+    """Extract answer text from common Coze response shapes."""
+    if not isinstance(payload, dict):
+        return ""
+
+    data = payload.get("data")
+
+    if isinstance(data, list):
+        for item in data:
+            if isinstance(item, dict) and item.get("type") == "answer" and item.get("content"):
+                return item.get("content")
+        for item in data:
+            if isinstance(item, dict) and item.get("role") == "assistant" and item.get("content"):
+                return item.get("content")
+
+    if isinstance(data, dict):
+        if data.get("answer"):
+            return data.get("answer")
+
+        messages = data.get("messages") or data.get("message") or []
+        if isinstance(messages, list):
+            for item in messages:
+                if isinstance(item, dict) and item.get("type") == "answer" and item.get("content"):
+                    return item.get("content")
+            for item in messages:
+                if isinstance(item, dict) and item.get("role") == "assistant" and item.get("content"):
+                    return item.get("content")
+
+    if payload.get("answer"):
+        return payload.get("answer")
+
+    return ""
 
 
 @app.route("/dashboard")
@@ -190,8 +296,6 @@ def dashboard():
 
 @app.route("/community")
 def community():
-    if not session.get("user_id"):
-        return redirect(url_for("login"))
     return render_template("community.html")
 
 
@@ -727,18 +831,13 @@ def like_community_post(post_id):
 def create_community_post():
     conn = None
     try:
-        user_id = session.get("user_id")
-        author_name = (session.get("username") or "匿名用户").strip()
-
-        if not user_id:
-            return jsonify({"code": 401, "message": "请先登录后再发帖"}), 401
-
         data = request.get_json(silent=True)
         print("[POST posts] data =", data)
 
         if not data:
             return jsonify({"code": 400, "message": "请求体不能为空"}), 400
 
+        author_name = (data.get("author_name") or "匿名用户").strip()
         topic = (data.get("topic") or "").strip()
         content = (data.get("content") or "").strip()
         image_url = data.get("image_url") or ""
@@ -750,11 +849,10 @@ def create_community_post():
         with conn.cursor() as cursor:
             cursor.execute(
                 """
-                INSERT INTO community_posts
-                (user_id, author_name, topic, content, image_url, like_count, comment_count)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO community_posts (author_name, topic, content, image_url, like_count, comment_count)
+                VALUES (%s, %s, %s, %s, %s, %s)
                 """,
-                (user_id, author_name, topic, content, image_url, 0, 0)
+                (author_name, topic, content, image_url, 0, 0)
             )
             post_id = cursor.lastrowid
 
@@ -773,21 +871,17 @@ def create_community_post():
             conn.close()
 
 
+
 @app.route("/api/community/comments", methods=["POST"])
 def create_community_comment():
     conn = None
     try:
-        user_id = session.get("user_id")
-        author_name = (session.get("username") or "匿名用户").strip()
-
-        if not user_id:
-            return jsonify({"code": 401, "message": "请先登录后再评论"}), 401
-
         data = request.get_json(silent=True)
         if not data:
             return jsonify({"code": 400, "message": "请求体不能为空"}), 400
 
         post_id = data.get("post_id")
+        author_name = (data.get("author_name") or "匿名用户").strip()
         content = (data.get("content") or "").strip()
 
         if not post_id:
