@@ -30,13 +30,21 @@ def concern_match(text: str, concern: str) -> bool:
 def apply_rules(candidates: list, user_info: dict) -> list:
     filtered = []
 
+    concerns = (
+        user_info.get("primary_concerns")
+        or user_info.get("user_selected_concerns")
+        or [user_info.get("primary_concern", "unknown")]
+    )
+    concerns = [c for c in concerns if c] or ["unknown"]
+
     for item in candidates:
         text = item.get("text", "")
 
         if not pet_type_match(text, user_info["pet_type"]):
             continue
 
-        if not concern_match(text, user_info["primary_concern"]):
+        # 多症状场景：任一关注点匹配即可保留，不再只按第一个症状过滤。
+        if not any(concern_match(text, concern) for concern in concerns):
             continue
 
         filtered.append(item)

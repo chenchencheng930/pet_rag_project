@@ -301,26 +301,80 @@ def pick_best_product_text(filtered_items: list) -> str:
     return filtered_items[0].get("text", "")
 
 
+def unique_extend(items: list) -> list:
+    result = []
+    for item in items:
+        if item and item not in result:
+            result.append(item)
+    return result
+
+
+def pick_product_texts_by_concern(filtered_items: list, concerns: list, limit: int = 3) -> list:
+    if not filtered_items:
+        return []
+
+    selected = []
+    used_texts = set()
+
+    for concern in concerns:
+        for item in filtered_items:
+            meta = item.get("metadata", {})
+            text = item.get("text", "")
+            if not text or text in used_texts:
+                continue
+            if meta.get("matched_concern") == concern:
+                selected.append((text, concern))
+                used_texts.add(text)
+                break
+
+    for item in filtered_items:
+        if len(selected) >= limit:
+            break
+        text = item.get("text", "")
+        if text and text not in used_texts:
+            matched = item.get("metadata", {}).get("matched_concern") or (concerns[0] if concerns else "unknown")
+            selected.append((text, matched))
+            used_texts.add(text)
+
+    return selected[:limit]
+
+
 def build_assessment_result(filtered_items: list, user_info: dict, assessment_result: dict) -> dict:
     summary = user_info["summary"]
 
     suspected_conditions = assessment_result.get("suspected_conditions", [])
     overall_risk_level = assessment_result.get("overall_risk_level", "low")
 
-    if suspected_conditions:
-        concern = suspected_conditions[0].get("condition_key", user_info.get("primary_concern", "unknown"))
-    else:
-        concern = user_info.get("primary_concern", "unknown")
+    concerns = []
+    for item in suspected_conditions:
+        key = item.get("condition_key")
+        if key and key not in concerns:
+            concerns.append(key)
 
-    best_text = pick_best_product_text(filtered_items)
+    for key in user_info.get("primary_concerns", []) or user_info.get("user_selected_concerns", []):
+        if key and key not in concerns:
+            concerns.append(key)
+
+    if not concerns:
+        concerns = [user_info.get("primary_concern", "unknown")]
+
+    primary_concern = concerns[0]
+
+    product_recommendations = []
+    for text, matched_concern in pick_product_texts_by_concern(filtered_items, concerns):
+        product_recommendations.extend(build_product_recommendations(text, matched_concern))
+
+    if not product_recommendations:
+        best_text = pick_best_product_text(filtered_items)
+        product_recommendations = build_product_recommendations(best_text, primary_concern)
 
     return {
         "summary": summary,
-        "suspected_conditions": suspected_conditions if suspected_conditions else build_suspected_conditions(concern, user_info),
+        "suspected_conditions": suspected_conditions if suspected_conditions else build_suspected_conditions(primary_concern, user_info),
         "overall_risk_level": overall_risk_level,
-        "health_advice": build_health_advice(concern),
-        "diet_advice": build_diet_advice(concern),
-        "product_recommendations": build_product_recommendations(best_text, concern)
+        "health_advice": unique_extend(sum([build_health_advice(c) for c in concerns[:3]], [])),
+        "diet_advice": unique_extend(sum([build_diet_advice(c) for c in concerns[:3]], [])),
+        "product_recommendations": product_recommendations[:3]
     }
 
 

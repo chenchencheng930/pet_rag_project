@@ -649,6 +649,7 @@ def assessment():
         else:
             selected_concerns = [raw_primary_concern] if raw_primary_concern else []
 
+        # 多症状/多关注点：不再只取第一个，而是保留完整列表。
         primary_concern = selected_concerns[0] if selected_concerns else "unknown"
 
         followup_answers = data.get("followup_answers", {})
@@ -656,6 +657,7 @@ def assessment():
         user_info = {
             "pet_type": pet_type,
             "primary_concern": primary_concern,
+            "primary_concerns": selected_concerns,
             "basic_info": basic_info,
             "symptoms": symptoms,
             "medical_indicators": medical_indicators,
@@ -688,23 +690,51 @@ def assessment():
             })
 
         suspected_conditions = assessment_result.get("suspected_conditions", [])
-        if suspected_conditions:
-            candidate_keys = [item.get("condition_key") for item in suspected_conditions if item.get("condition_key")]
-            concern_key = next((k for k in candidate_keys if k in selected_concerns),
-                               candidate_keys[0] if candidate_keys else primary_concern)
-        else:
-            concern_key = primary_concern
 
+        candidate_keys = [
+            item.get("condition_key")
+            for item in suspected_conditions
+            if item.get("condition_key")
+        ]
+
+        # 综合用户勾选项 + 评估引擎识别出的中高风险方向。
+        concern_keys = []
+        for key in selected_concerns + candidate_keys:
+            if key and key != "unknown" and key not in concern_keys:
+                concern_keys.append(key)
+
+        if not concern_keys:
+            concern_keys = [primary_concern or "unknown"]
+
+        # primary_concern 保留一个主方向兼容旧逻辑；primary_concerns 用于多方向过滤和推荐。
+        concern_key = concern_keys[0]
         user_info["primary_concern"] = concern_key
+        user_info["primary_concerns"] = concern_keys
+        user_info["user_selected_concerns"] = selected_concerns
 
-        query = f"适合{pet_type}的{concern_key}方向处方粮推荐"
-        candidates = rag_engine.retrieve(
-            pet_type=pet_type,
-            concern_key=concern_key,
-            query=query
-        )
+        all_candidates = []
+        seen_candidate_texts = set()
 
-        filtered_items = apply_rules(candidates, user_info)
+        for current_concern in concern_keys:
+            query = f"适合{pet_type}的{current_concern}方向处方粮推荐"
+            retrieved_items = rag_engine.retrieve(
+                pet_type=pet_type,
+                concern_key=current_concern,
+                query=query
+            )
+
+            for item in retrieved_items:
+                item_copy = dict(item)
+                metadata = dict(item_copy.get("metadata", {}))
+                metadata["matched_concern"] = current_concern
+                item_copy["metadata"] = metadata
+
+                text_key = item_copy.get("text", "")
+                if text_key and text_key not in seen_candidate_texts:
+                    seen_candidate_texts.add(text_key)
+                    all_candidates.append(item_copy)
+
+        filtered_items = apply_rules(all_candidates, user_info)
 
         result = build_assessment_result(
             filtered_items=filtered_items,
@@ -721,8 +751,8 @@ def assessment():
                 """,
                 (
                     None,
-                    None,
-                    concern_key,
+                    session.get("user_id"),
+                    ",".join(concern_keys),
                     str(result.get("suspected_conditions", [])),
                     " | ".join(result.get("diet_advice", []))
                 )
