@@ -1019,8 +1019,26 @@ def get_community_posts():
         current_user = get_current_user_record()
         current_is_admin = is_admin_user(current_user)
 
+        try:
+            page = int(request.args.get("page", 1))
+        except Exception:
+            page = 1
+
+        try:
+            page_size = int(request.args.get("page_size", 10))
+        except Exception:
+            page_size = 10
+
+        page = max(page, 1)
+        page_size = min(max(page_size, 1), 20)
+        offset = (page - 1) * page_size
+
         conn = get_db_connection()
         with conn.cursor() as cursor:
+            cursor.execute("SELECT COUNT(*) AS cnt FROM community_posts")
+            total = cursor.fetchone()["cnt"]
+
+            # 只拉当前页帖子，不再一次性加载所有帖子和所有评论。
             cursor.execute(
                 """
                 SELECT p.id, p.user_id, p.author_name, p.topic, p.content, p.image_url,
@@ -1029,47 +1047,21 @@ def get_community_posts():
                 FROM community_posts p
                 LEFT JOIN users u ON p.user_id = u.id
                 ORDER BY p.id DESC
-                """
+                LIMIT %s OFFSET %s
+                """,
+                (page_size, offset)
             )
             posts = cursor.fetchall()
 
-            cursor.execute(
-                """
-                SELECT c.id, c.post_id, c.user_id, c.parent_comment_id, c.reply_to_user_id,
-                       c.author_name, c.content, c.image_url, c.created_at,
-                       u.avatar_data,
-                       ru.username AS reply_to_username
-                FROM community_comments c
-                LEFT JOIN users u ON c.user_id = u.id
-                LEFT JOIN users ru ON c.reply_to_user_id = ru.id
-                ORDER BY c.id ASC
-                """
-            )
-            comments = cursor.fetchall()
-
             liked_ids = set()
-            if current_user_id:
+            if current_user_id and posts:
+                post_ids = [post["id"] for post in posts]
+                placeholders = ",".join(["%s"] * len(post_ids))
                 cursor.execute(
-                    "SELECT post_id FROM community_post_likes WHERE user_id=%s",
-                    (current_user_id,)
+                    f"SELECT post_id FROM community_post_likes WHERE user_id=%s AND post_id IN ({placeholders})",
+                    tuple([current_user_id] + post_ids)
                 )
                 liked_ids = {row["post_id"] for row in cursor.fetchall()}
-
-        comments_map = {}
-        for item in comments:
-            comments_map.setdefault(item["post_id"], []).append({
-                "id": item["id"],
-                "post_id": item["post_id"],
-                "user_id": item.get("user_id"),
-                "parent_comment_id": item.get("parent_comment_id"),
-                "reply_to_user_id": item.get("reply_to_user_id"),
-                "reply_to_username": item.get("reply_to_username") or "",
-                "author_name": item.get("author_name") or "匿名用户",
-                "avatar_data": item.get("avatar_data") or "",
-                "content": item.get("content") or "",
-                "image_url": item.get("image_url") or "",
-                "created_at": format_dt(item.get("created_at"))
-            })
 
         data = []
         for post in posts:
@@ -1087,13 +1079,20 @@ def get_community_posts():
                 "created_at": format_dt(post.get("created_at")),
                 "liked_by_me": post["id"] in liked_ids,
                 "can_delete": bool(is_owner or current_is_admin),
-                "comments_list": comments_map.get(post["id"], [])
+                # 评论改为点击展开时懒加载，提升社区首页打开速度。
+                "comments_list": []
             })
 
         return jsonify({
             "code": 200,
             "message": "success",
             "data": data,
+            "pagination": {
+                "page": page,
+                "page_size": page_size,
+                "total": total,
+                "has_more": offset + len(posts) < total
+            },
             "current_user": {
                 "id": current_user_id,
                 "username": session.get("username"),
@@ -1105,6 +1104,54 @@ def get_community_posts():
         print("[GET posts] error =", e)
         traceback.print_exc()
         return jsonify({"code": 500, "message": "failed to fetch posts", "error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route("/api/community/posts/<int:post_id>/comments", methods=["GET"])
+def get_community_post_comments(post_id):
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT c.id, c.post_id, c.user_id, c.parent_comment_id, c.reply_to_user_id,
+                       c.author_name, c.content, c.image_url, c.created_at,
+                       u.avatar_data,
+                       ru.username AS reply_to_username
+                FROM community_comments c
+                LEFT JOIN users u ON c.user_id = u.id
+                LEFT JOIN users ru ON c.reply_to_user_id = ru.id
+                WHERE c.post_id=%s
+                ORDER BY c.id ASC
+                """,
+                (post_id,)
+            )
+            rows = cursor.fetchall()
+
+        data = [
+            {
+                "id": item["id"],
+                "post_id": item["post_id"],
+                "user_id": item.get("user_id"),
+                "parent_comment_id": item.get("parent_comment_id"),
+                "reply_to_user_id": item.get("reply_to_user_id"),
+                "reply_to_username": item.get("reply_to_username") or "",
+                "author_name": item.get("author_name") or "匿名用户",
+                "avatar_data": item.get("avatar_data") or "",
+                "content": item.get("content") or "",
+                "image_url": item.get("image_url") or "",
+                "created_at": format_dt(item.get("created_at"))
+            }
+            for item in rows
+        ]
+
+        return jsonify({"code": 200, "message": "success", "data": data})
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"code": 500, "message": "failed to fetch comments", "error": str(e)}), 500
     finally:
         if conn:
             conn.close()

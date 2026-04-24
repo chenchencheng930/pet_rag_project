@@ -146,6 +146,9 @@
         let currentCommentImages = {};
         let activeReplies = {};
         let notificationPanelOpen = false;
+        let currentPage = 1;
+        let hasMorePosts = true;
+        let isLoadingPosts = false;
 
         const CommunityDataStore = {
             feeds: [],
@@ -218,9 +221,12 @@
             }
         }
 
-        async function loadPostsFromServer() {
+        async function loadPostsFromServer(page = 1, append = false) {
+            if (isLoadingPosts) return;
+            isLoadingPosts = true;
+
             try {
-                const res = await fetch('/api/community/posts', { credentials: 'include' });
+                const res = await fetch(`/api/community/posts?page=${page}&page_size=10`, { credentials: 'include' });
                 const json = await res.json();
 
                 if (json.code === 200) {
@@ -229,7 +235,7 @@
                         localStorage.setItem('currentUser', CommunityDataStore.currentUser.username);
                     }
 
-                    CommunityDataStore.feeds = (json.data || []).map(post => ({
+                    const incomingFeeds = (json.data || []).map(post => ({
                         id: post.id,
                         userId: post.user_id,
                         authorName: post.author_name || '社区用户',
@@ -242,18 +248,49 @@
                         likes: post.like_count || 0,
                         comments: post.comment_count || 0,
                         comments_list: post.comments_list || [],
+                        commentsLoaded: false,
                         isLiked: !!post.liked_by_me,
                         canDelete: !!post.can_delete,
                         commentsExpanded: false
                     }));
-                } else {
+
+                    CommunityDataStore.feeds = append
+                        ? CommunityDataStore.feeds.concat(incomingFeeds)
+                        : incomingFeeds;
+
+                    currentPage = json.pagination?.page || page;
+                    hasMorePosts = !!json.pagination?.has_more;
+                } else if (!append) {
                     CommunityDataStore.feeds = [];
+                    hasMorePosts = false;
                 }
             } catch (e) {
-                CommunityDataStore.feeds = [];
+                if (!append) CommunityDataStore.feeds = [];
+                hasMorePosts = false;
+            } finally {
+                isLoadingPosts = false;
             }
 
             renderFeedList();
+        }
+
+        async function loadMorePosts() {
+            if (!hasMorePosts || isLoadingPosts) return;
+            await loadPostsFromServer(currentPage + 1, true);
+        }
+
+        async function loadCommentsForPost(postId) {
+            const post = CommunityDataStore.feeds.find(p => p.id === postId);
+            if (!post || post.commentsLoaded) return;
+
+            try {
+                const res = await fetch(`/api/community/posts/${postId}/comments`, { credentials: 'include' });
+                const json = await res.json();
+                if (json.code === 200) {
+                    post.comments_list = json.data || [];
+                    post.commentsLoaded = true;
+                }
+            } catch (e) {}
         }
 
         function renderFeedList() {
@@ -292,7 +329,7 @@
                             </div>
                         `;
                     }).join('')
-                    : `<div class="comment-empty">还没有评论，来抢沙发吧。</div>`;
+                    : `<div class="comment-empty">${post.commentsLoaded ? '还没有评论，来抢沙发吧。' : '正在加载评论...'}</div>`;
 
                 const panelHtml = post.commentsExpanded ? `
                     <div class="comment-panel">
@@ -354,6 +391,16 @@
                 container.insertAdjacentHTML('beforeend', postHtml);
             });
 
+            if (hasMorePosts) {
+                container.insertAdjacentHTML('beforeend', `
+                    <div style="text-align:center;margin:20px 0;">
+                        <button type="button" onclick="loadMorePosts()" style="border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;border-radius:999px;padding:10px 22px;cursor:pointer;">
+                            加载更多
+                        </button>
+                    </div>
+                `);
+            }
+
             Object.keys(activeReplies).forEach(postId => updateReplyTip(Number(postId)));
         }
 
@@ -370,10 +417,16 @@
             return String(value || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
         }
 
-        function toggleComments(postId) {
+        async function toggleComments(postId) {
             const post = CommunityDataStore.feeds.find(p => p.id === postId);
             if (!post) return;
             post.commentsExpanded = !post.commentsExpanded;
+
+            if (post.commentsExpanded && !post.commentsLoaded) {
+                renderFeedList();
+                await loadCommentsForPost(postId);
+            }
+
             renderFeedList();
         }
 
@@ -492,7 +545,7 @@ try {
                 inputEl.value = '';
                 topicEl.value = '';
                 removeImage();
-                await loadPostsFromServer();
+                await loadPostsFromServer(1, false);
             } catch (e) {
                 alert('发帖失败，请检查后端接口是否启动');
             }
@@ -533,7 +586,7 @@ try {
                 textarea.value = '';
                 removeCommentImage(postId);
                 clearReplyTarget(postId);
-                await loadPostsFromServer();
+                await loadPostsFromServer(1, false);
 
                 const post = CommunityDataStore.feeds.find(p => p.id === postId);
                 if (post) post.commentsExpanded = true;
@@ -581,7 +634,7 @@ try {
                     alert(json.message || '删除失败');
                     return;
                 }
-                await loadPostsFromServer();
+                await loadPostsFromServer(1, false);
             } catch (e) {
                 alert('删除失败，请稍后重试');
             }
@@ -591,5 +644,7 @@ try {
 <script src="{{ url_for('static', filename='js/global_reminder.js') }}"></script>
 
     <script src="{{ url_for('static', filename='js/mobile.js') }}"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"45c2bf8136a245cd97f1c2e9a96c0730","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
 </html>
