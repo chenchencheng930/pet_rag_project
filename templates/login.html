@@ -2,13 +2,15 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>系统鉴权 - 一宠一配方</title>
     <style>
         /* 基础页面设置 */
         body {
             margin: 0;
             padding: 0;
-            height: 100vh;
+            min-height: 100vh;
+            height: auto;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -132,8 +134,9 @@
             display: none;
         }
     </style>
+    <link href="{{ url_for('static', filename='css/mobile.css') }}" rel="stylesheet">
 </head>
-<body>
+<body class="auth-page">
 
     <div class="auth-card">
         <div class="brand-logo-container">
@@ -236,7 +239,6 @@
     </script>
 
 <script src="{{ url_for('static', filename='js/global_reminder.js') }}"></script>
-<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
-<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"45c2bf8136a245cd97f1c2e9a96c0730","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+
 </body>
 </html>

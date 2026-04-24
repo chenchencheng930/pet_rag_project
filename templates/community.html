@@ -43,8 +43,11 @@
             .comment-submit-btn { width: 100%; }
         }
     </style>
+    <link href="{{ url_for('static', filename='css/mobile.css') }}" rel="stylesheet">
 </head>
 <body>
+    <button class="mobile-menu-btn" type="button" onclick="toggleMobileSidebar()" aria-label="打开导航">☰</button>
+    <div class="mobile-mask" onclick="closeMobileSidebar()"></div>
     <aside class="sidebar">
         <div class="sidebar-brand">
             <img src="{{ url_for('static', filename='assets/logo.jpg') }}" alt="系统Logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
@@ -383,7 +386,7 @@
 
     </script>
 <script src="{{ url_for('static', filename='js/global_reminder.js') }}"></script>
-<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
-<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"45c2bf8136a245cd97f1c2e9a96c0730","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+
+    <script src="{{ url_for('static', filename='js/mobile.js') }}"></script>
 </body>
 </html>

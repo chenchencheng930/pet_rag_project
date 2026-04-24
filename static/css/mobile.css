@@ -1,0 +1,228 @@
+/* 文件位置：static/css/mobile.css */
+/* 手机端统一适配：滚动、抽屉侧边栏、满屏登录、窄屏卡片 */
+
+.mobile-menu-btn,
+.mobile-mask {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    html,
+    body {
+        width: 100%;
+        min-height: 100%;
+        height: auto !important;
+        overflow-x: hidden !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    body {
+        display: block !important;
+    }
+
+    .mobile-menu-btn {
+        display: flex;
+        position: fixed;
+        top: 12px;
+        left: 12px;
+        z-index: 20050;
+        width: 42px;
+        height: 42px;
+        align-items: center;
+        justify-content: center;
+        background: #1a365d;
+        color: #fff;
+        border: none;
+        border-radius: 10px;
+        font-size: 22px;
+        line-height: 1;
+        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.18);
+    }
+
+    .mobile-mask {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.46);
+        z-index: 20000;
+    }
+
+    .mobile-mask.active {
+        display: block;
+    }
+
+    .sidebar {
+        display: flex !important;
+        position: fixed !important;
+        top: 0 !important;
+        left: -240px !important;
+        width: 220px !important;
+        height: 100vh !important;
+        max-height: 100vh !important;
+        overflow-y: auto !important;
+        z-index: 20010 !important;
+        transition: left 0.25s ease !important;
+        flex-shrink: 0 !important;
+    }
+
+    .sidebar.mobile-open {
+        left: 0 !important;
+    }
+
+    .main-content,
+    #chat-wrapper {
+        position: relative !important;
+        left: 0 !important;
+        top: 0 !important;
+        width: 100% !important;
+        min-height: 100vh !important;
+        height: auto !important;
+        margin-left: 0 !important;
+        overflow-x: hidden !important;
+        overflow-y: visible !important;
+        padding-top: 54px !important;
+        box-sizing: border-box !important;
+    }
+
+    .top-header,
+    .chat-header {
+        min-height: 50px !important;
+        height: auto !important;
+        padding-left: 64px !important;
+        padding-right: 12px !important;
+        box-sizing: border-box !important;
+        flex-wrap: wrap !important;
+        gap: 8px !important;
+    }
+
+    .content-body,
+    .community-wrapper,
+    .profile-container,
+    .reminder-container {
+        width: 100% !important;
+        max-width: 100% !important;
+        padding: 16px 12px 28px !important;
+        box-sizing: border-box !important;
+    }
+
+    .custom-card,
+    .module-card,
+    .publisher-card,
+    .feed-item,
+    .user-card,
+    .stat-card,
+    .menu-list,
+    .tool-card {
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    .custom-card,
+    .module-card,
+    .publisher-card,
+    .feed-item {
+        padding: 18px !important;
+    }
+
+    .row {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+
+    .score-circle {
+        width: 110px !important;
+        height: 110px !important;
+    }
+
+    .chat-messages {
+        min-height: calc(100vh - 170px) !important;
+        overflow-y: auto !important;
+        padding: 14px 12px !important;
+    }
+
+    .message {
+        max-width: 92% !important;
+        font-size: 14px !important;
+    }
+
+    .chat-input-area {
+        position: sticky !important;
+        bottom: 0 !important;
+        padding: 10px 12px !important;
+        gap: 8px !important;
+        box-sizing: border-box !important;
+    }
+
+    .chat-input-area textarea {
+        min-height: 42px !important;
+    }
+
+    .chat-input-area button {
+        margin-left: 0 !important;
+        padding: 10px 16px !important;
+    }
+
+    .auth-page {
+        min-height: 100vh !important;
+        height: auto !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        padding: 20px 14px !important;
+        box-sizing: border-box !important;
+        overflow-y: auto !important;
+    }
+
+    .auth-card {
+        max-width: 100% !important;
+        width: 100% !important;
+        padding: 34px 24px !important;
+        box-sizing: border-box !important;
+        border-radius: 14px !important;
+    }
+
+    .brand-logo-container {
+        width: 82px !important;
+        height: 82px !important;
+        margin-bottom: 16px !important;
+    }
+
+    .brand-title {
+        font-size: 24px !important;
+        letter-spacing: 1px !important;
+    }
+
+    .brand-subtitle {
+        margin-bottom: 28px !important;
+    }
+
+    .modal-card {
+        max-width: calc(100vw - 24px) !important;
+        max-height: calc(100vh - 24px) !important;
+        overflow-y: auto !important;
+    }
+
+    .modal-body {
+        max-height: 70vh !important;
+    }
+
+    .publisher-toolbar,
+    .toolbar-actions,
+    .comment-input-row,
+    .reminder-form,
+    .feedback-buttons,
+    .diet-labels,
+    .timeline-content {
+        flex-direction: column !important;
+        align-items: stretch !important;
+    }
+
+    .topic-custom-input,
+    .btn-publish,
+    .comment-submit-btn,
+    .btn-add,
+    .btn-feedback {
+        width: 100% !important;
+    }
+}

@@ -101,3 +101,37 @@
     color: #ef4444;
     border: 4px solid #fecaca;
 }
+
+@media (max-width: 768px) {
+    .content-body {
+        padding: 16px 12px 28px;
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+
+    .custom-card {
+        padding: 18px;
+        border-radius: 12px;
+    }
+
+    .card-title {
+        font-size: 16px;
+        margin-bottom: 18px;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .disease-item {
+        padding: 14px;
+    }
+
+    .disease-details {
+        padding: 14px;
+    }
+
+    .log-box {
+        height: 170px;
+        font-size: 12px;
+        padding: 14px;
+    }
+}

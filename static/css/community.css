@@ -234,3 +234,35 @@
     border-color: #3b82f6;
     box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
 }
+
+@media (max-width: 768px) {
+    .community-wrapper {
+        padding: 12px;
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+
+    .publisher-card,
+    .feed-item {
+        padding: 16px;
+        border-radius: 12px;
+    }
+
+    .publisher-toolbar,
+    .toolbar-actions {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+    }
+
+    .topic-custom-input,
+    .btn-publish {
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .feed-footer {
+        gap: 16px;
+        flex-wrap: wrap;
+    }
+}

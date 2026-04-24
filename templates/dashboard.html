@@ -2,6 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>宠物身体信息评估 - 临床智能辅助系统</title>
     <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/common.css') }}" rel="stylesheet">
@@ -24,8 +25,11 @@
         }
         @keyframes fadeIn { to { opacity: 1; } }
     </style>
+    <link href="{{ url_for('static', filename='css/mobile.css') }}" rel="stylesheet">
 </head>
 <body>
+    <button class="mobile-menu-btn" type="button" onclick="toggleMobileSidebar()" aria-label="打开导航">☰</button>
+    <div class="mobile-mask" onclick="closeMobileSidebar()"></div>
 
     <aside class="sidebar">
         <div class="sidebar-brand">
@@ -229,5 +233,6 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 </script>
 
+    <script src="{{ url_for('static', filename='js/mobile.js') }}"></script>
 </body>
 </html>
