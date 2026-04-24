@@ -102,6 +102,59 @@
             align-self: flex-start; background: #f1f5f9;
             color: #333; border-bottom-left-radius: 2px;
         }
+
+        .bot-message {
+            white-space: normal;
+        }
+        .bot-message h1,
+        .bot-message h2,
+        .bot-message h3 {
+            margin: 10px 0 6px;
+            font-weight: 700;
+            color: #1e293b;
+            line-height: 1.35;
+        }
+        .bot-message h1 { font-size: 20px; }
+        .bot-message h2 { font-size: 18px; }
+        .bot-message h3 { font-size: 16px; }
+        .bot-message p {
+            margin: 6px 0;
+            line-height: 1.75;
+        }
+        .bot-message ul,
+        .bot-message ol {
+            margin: 8px 0;
+            padding-left: 22px;
+        }
+        .bot-message li {
+            margin: 4px 0;
+        }
+        .bot-message strong {
+            font-weight: 700;
+            color: #0f172a;
+        }
+        .bot-message code {
+            background: #e2e8f0;
+            padding: 2px 5px;
+            border-radius: 4px;
+            font-family: Consolas, Monaco, monospace;
+            font-size: 13px;
+        }
+        .bot-message pre {
+            background: #0f172a;
+            color: #e2e8f0;
+            padding: 12px;
+            border-radius: 8px;
+            overflow-x: auto;
+            white-space: pre;
+        }
+        .bot-message blockquote {
+            margin: 8px 0;
+            padding-left: 12px;
+            border-left: 4px solid #cbd5e1;
+            color: #475569;
+        }
+
         .loading {
             align-self: flex-start;
             color: #666; font-style: italic; padding: 10px 15px;
@@ -157,6 +210,9 @@
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.8/dist/purify.min.js"></script>
+
     <script>
     const chatMessages = document.getElementById('chat-messages');
     const userInput = document.getElementById('user-input');
@@ -171,6 +227,16 @@
 
     function scrollToBottom() {
         chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+
+    function renderMarkdown(target, markdownText) {
+        const raw = markdownText || '';
+        if (window.marked && window.DOMPurify) {
+            target.innerHTML = DOMPurify.sanitize(marked.parse(raw));
+        } else {
+            target.textContent = raw;
+        }
     }
 
     async function requestConversation(query) {
@@ -205,7 +271,7 @@
 
         try {
             const answer = await requestConversation(query);
-            assistantDiv.textContent = answer;
+            renderMarkdown(assistantDiv, answer);
         } catch (error) {
             console.error('聊天请求错误:', error);
             assistantDiv.textContent = `抱歉，出错: ${error.message}`;
@@ -229,6 +295,8 @@
         }
     });
 </script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"45c2bf8136a245cd97f1c2e9a96c0730","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"45c2bf8136a245cd97f1c2e9a96c0730","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
