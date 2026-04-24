@@ -126,7 +126,7 @@
 
         async function loadPostsFromServer() {
             try {
-                const res = await fetch('/api/community/posts');
+                const res = await fetch('/api/community/posts', { credentials: 'include' });
                 const json = await res.json();
 
                 if (json.code === 200) {
@@ -292,14 +292,12 @@
                 return;
             }
 
-            const author = CommunityDataStore.getCurrentUser();
-
             try {
                 const res = await fetch('/api/community/posts', {
                     method: 'POST',
+                    credentials: 'include',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        author_name: author,
                         topic: topic,
                         content: content,
                         image_url: currentSelectedImageBase64
@@ -331,15 +329,13 @@
                 return;
             }
 
-            const author = CommunityDataStore.getCurrentUser();
-
             try {
                 const res = await fetch('/api/community/comments', {
                     method: 'POST',
+                    credentials: 'include',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         post_id: postId,
-                        author_name: author,
                         content: content
                     })
                 });
@@ -370,7 +366,8 @@
         async function toggleLike(postId) {
             try {
                 const res = await fetch(`/api/community/posts/${postId}/like`, {
-                    method: 'POST'
+                    method: 'POST',
+                    credentials: 'include'
                 });
                 const json = await res.json();
                 if (json.code === 200) {
@@ -386,5 +383,7 @@
 
     </script>
 <script src="{{ url_for('static', filename='js/global_reminder.js') }}"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"45c2bf8136a245cd97f1c2e9a96c0730","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
 </html>
